@@ -34,12 +34,12 @@ int quick_select(int input[], int p, int r, int k) {
 }
 
 int main() {
-  int A[100] = {0};
-  for (int i = 0; i < 100; i++)
-    A[i] = rand()%500;
-  print_array(A, 100);
-  for (int i = 0; i < 20; i ++)
-    cout << quick_select(A, 0, 100 - 1, i) << ' ';
+  int A[5] = {100, 400, 500, 300, 200};
+//  for (int i = 0; i < 100; i++)
+//    A[i] = rand()%500;
+//  print_array(A, 10);
+  for (int i = 1; i <= 5; i ++)
+    cout << quick_select(A, 0, 4, i) << ' ';
   cout << endl;
   return 0;
 }
