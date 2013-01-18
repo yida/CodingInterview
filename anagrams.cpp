@@ -29,11 +29,7 @@ void Wordslist::lexi_sort() {
     for (int j = 0; j < words[i].length(); j++)
       ascii[words[i][j]] ++;
     string str;
-    for (char k = 'A'; k <= 'Z'; k++) {
-      str.append(ascii[k], k);
-      ascii[k] = 0;
-    }
-    for (char k = 'a'; k <= 'z'; k++) {
+    for (char k = 'A'; k <= 'z'; k++) {
       str.append(ascii[k], k);
       ascii[k] = 0;
     }
