@@ -84,21 +84,95 @@ vector<string> SinglyLinked::to_array() {
   return list;
 }
 
+class DoublyLinked {
+  Node* head;
+  Node* tail;
+public:
+  DoublyLinked():head(NULL), tail(NULL) {}
+  ~DoublyLinked() {}
+  void add(string str);
+  Node* find(string str);
+  void remove(string str);
+  vector<string> to_array();
+};
+
+void DoublyLinked::add(string str) {
+  if (head == NULL) {
+    head = new Node(str);
+    tail = head;
+  } else {
+    Node* ptr = new Node(str);
+    tail->set_next(ptr);
+    ptr->set_prev(tail);
+    tail = tail->get_next();
+  }
+}
+
+Node* DoublyLinked::find(string str) {
+  Node* ptr = head;
+  while (ptr != NULL) {
+    if (ptr->get_str().compare(str) == 0)
+      return ptr;
+    ptr = ptr->get_next();
+  }
+}
+
+void DoublyLinked::remove(string str) {
+  if (head == NULL) return;
+  if (head->get_str().compare(str) == 0) {
+    Node* ptr = head;
+    head = ptr->get_next();
+    head->set_prev(NULL);
+    delete ptr;
+    return; 
+  }
+  if (tail->get_str().compare(str) == 0) {
+    Node* ptr = tail;
+    tail = tail->get_prev();
+    tail->set_next(NULL);
+    delete ptr;
+    return;
+  }
+  Node* parent = head;
+  Node* ptr = head->get_next();
+  while (ptr != NULL) {
+    if (ptr->get_str().compare(str) == 0) {
+      parent->set_next(ptr->get_next());  
+      parent->get_next()->set_prev(parent);
+      delete ptr;
+      return;
+    }
+    parent = ptr;
+    ptr = ptr->get_next();
+  }
+}
+
+vector<string> DoublyLinked::to_array() {
+  vector<string> list;
+  Node* ptr = head;
+  while (ptr != NULL) {
+    list.push_back(ptr->get_str());
+    ptr = ptr->get_next();
+  }
+  return list;
+}
+
 int main() {
-  SinglyLinked slist;
+  DoublyLinked slist;
   slist.add("array");
   slist.add("test");
+  slist.add("computer");
   slist.add("word");
-  Node* finding = slist.find("array");
+  Node* finding = slist.find("rray");
   if (finding != NULL)
     cout << finding->get_str() << endl;
   vector<string> out = slist.to_array();
   for (vector<string>::iterator it = out.begin(); it != out.end(); it++)
     cout << *it << ' ';
   cout << endl;
-//  slist.remove("word");
+  slist.remove("word");
 //  slist.remove("array");
-  slist.remove("test");
+//  slist.remove("test");
   out = slist.to_array();
   for (vector<string>::iterator it = out.begin(); it != out.end(); it++)
     cout << *it << ' ';
