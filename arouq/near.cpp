@@ -87,12 +87,133 @@ ostream& operator<<(ostream& out, Query* query) {
   return out;
 }
 
-inline double dis(double x1, double y1, double x2, double y2) {
+class Map {
+  unordered_map<unsigned long, vector<unsigned long>*> grid;
+  size_t size;
+public:
+  Map(size_t csize): size(csize) {}
+  Map(): size(1000) {}
+  ~Map() {}
+  void insert(Topic* topic);
+  unsigned long xy2index(double x, double y);
+  vector<unsigned long> find(Query *query);
+  friend ostream& operator<< (ostream& out, Map& map);
+  void circle2queue(unsigned long idx, int extend, queue<unsigned long>& findtopic);
+  bool check_valid(int x, int y);
+  void QueryTopic(Query* query, unordered_map<unsigned long, Topic*>);
+  void QueryQuestion(Query* query, unordered_map<unsigned long, Question*>& Questions, 
+                      unordered_map<unsigned long, Topic*>& Topics);
+  int quick_selection(vector<Topic*>& topic, int p, int r, int k);
+  inline double dis(double x1, double y1, double x2, double y2);
+  int partition(vector<Topic*>& topic, int p, int r);
+
+};
+
+bool Map::check_valid(int x, int y) {
+  if (x < 0) return false;
+  if (x >= size) return false;
+  if (y < 0) return false;
+  if (y >= size) return false;
+  return true;
+}
+
+void Map::circle2queue(unsigned long idx, int extend, queue<unsigned long>& gridindex) {
+  int subx = idx / size; 
+  int suby = idx % size;
+  // add topleft
+  int topleftx = subx - extend;
+  int toplefty = suby - extend;
+  if (check_valid(topleftx, toplefty)) gridindex.push(topleftx * size + toplefty);
+  // add buttom right
+  int butrightx = subx + extend;
+  int butrighty = suby + extend;
+  if (check_valid(butrightx, butrighty)) gridindex.push(butrightx * size + butrighty);
+  // add button left
+  int butleftx = subx - extend;
+  int butlefty = suby + extend;
+  if (check_valid(butleftx, butlefty)) gridindex.push(butleftx * size + butlefty);
+  // add top right
+  int toprightx = subx + extend;
+  int toprighty = suby - extend;
+  if (check_valid(toprightx, toprighty)) gridindex.push(toprightx * size + toprighty);
+  // add top 
+  for (int x = topleftx + 1; x <= toprightx - 1; x ++) {
+    if (check_valid(x, toplefty)) gridindex.push(x * size + toplefty);
+    if (check_valid(x, butlefty)) gridindex.push(x * size + butlefty); 
+  }
+  // add button 
+  for (int y = toplefty + 1; y <= butlefty - 1; y ++) {
+    if (check_valid(topleftx, y)) gridindex.push(topleftx * size + y);
+    if (check_valid(toprightx, y)) gridindex.push(toprightx * size + y);
+  }
+}
+
+vector<unsigned long> Map::find(Query *query) {
+  vector<unsigned long> foundtopics;
+  foundtopics.clear();
+  unsigned long destindex = xy2index(query->get_x(), query->get_y());
+  queue<unsigned long> gridindex;
+  int extend = 0;
+  gridindex.push(destindex);
+  unordered_map<unsigned long, vector<unsigned long>*>::const_iterator it;
+  while (foundtopics.size() < query->get_results()) {
+    // check current circle
+    if (gridindex.size() == 0) break;
+    while (gridindex.size() > 0) {
+      unsigned long curindex = gridindex.front();
+      gridindex.pop();
+      it = grid.find(curindex);
+      if (it != grid.end()) {
+        vector<unsigned long> list = *grid[curindex];
+        for (int i = 0; i < list.size(); i++) {
+          foundtopics.push_back(list[i]);
+//          cout << list[i] << endl;
+        }
+      }
+    }
+    // add new circle
+//    cout << "add new circle" << endl;
+    circle2queue(destindex, ++extend, gridindex); 
+  }
+  return foundtopics;
+}
+
+ostream& operator<< (ostream& out, Map& map) {
+  for (auto it = map.grid.begin(); it != map.grid.end(); it++) {
+    vector<unsigned long> list = *it->second;
+    for (int i = 0; i < list.size(); i++)
+      cout << list[i] << ' ';
+  }
+  cout << endl;
+}
+
+unsigned long Map::xy2index(double x, double y) {
+  unsigned long xindex = round(x / size) * size;
+  unsigned long yindex = round(y / size) * size;
+  return xindex * size + yindex;
+}
+
+void Map::insert(Topic* topic) {
+  unsigned long index = xy2index(topic->get_x(), topic->get_y());
+  unordered_map<unsigned long, vector<unsigned long>*>::const_iterator it;
+  it = grid.find(index);
+  if (it != grid.end()) {
+    grid[index]->push_back(topic->get_id());
+  } else {
+    vector<unsigned long>* list = new vector<unsigned long>;
+    list->push_back(topic->get_id());
+    grid.insert(make_pair(index, list));
+  }
+}
+
+
+
+inline double Map::dis(double x1, double y1, double x2, double y2) {
   return sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2));
 }
 
 
-int partition(vector<Topic*>& topic, int p, int r) {
+int Map::partition(vector<Topic*>& topic, int p, int r) {
   Topic* pivot = topic[r];
   while (p < r) {
     while (topic[p]->get_dis() < pivot->get_dis()) p++;
@@ -107,7 +228,7 @@ int partition(vector<Topic*>& topic, int p, int r) {
   return r;
 }
 
-int quick_selection(vector<Topic*>& topic, int p, int r, int k) {
+int Map::quick_selection(vector<Topic*>& topic, int p, int r, int k) {
   if (p == r) return p;
   int j = partition(topic, p, r);
   int length = j - p + 1;
@@ -116,7 +237,18 @@ int quick_selection(vector<Topic*>& topic, int p, int r, int k) {
   else return quick_selection(topic, j+1, r, k-length);
 }
 
-void QueryTopic(Query* query, vector<Topic*>& TopicList) {
+void Map::QueryTopic(Query* query, unordered_map<unsigned long, Topic*> Topics) {
+  vector<unsigned long> candidatetopics = find(query);
+  vector<Topic*> TopicList;
+  while (candidatetopics.size() > 0) {
+    Topic* topic = Topics[candidatetopics.back()];
+    topic->set_dis(dis(query->get_x(), query->get_y(), topic->get_x(), topic->get_y()));
+    TopicList.push_back(topic);
+    candidatetopics.pop_back();
+  }
+
+//  cout << TopicList.size() << endl;
+
   unsigned long kth = 0;
   priority_queue<unsigned long> result_local;
   queue<unsigned long> result_queue;
@@ -125,6 +257,7 @@ void QueryTopic(Query* query, vector<Topic*>& TopicList) {
   while (i < TopicList.size()) {
     kth = quick_selection(TopicList, 0, TopicList.size() - 1, ++i);
     Topic* topic = TopicList[kth];
+//    cout << topic->get_id() << endl;
     if (lastTopic != NULL) {
       if (abs(lastTopic->get_dis() - topic->get_dis()) > 0.001) {
         while (result_local.size() > 0) {
@@ -152,7 +285,17 @@ void QueryTopic(Query* query, vector<Topic*>& TopicList) {
   cout << endl;
 }
 
-void QueryQuestion(Query* query, unordered_map<unsigned long, Question*>& Questions, vector<Topic*>& TopicList) {
+void Map::QueryQuestion(Query* query, unordered_map<unsigned long, Question*>& Questions,
+                        unordered_map<unsigned long, Topic*>& Topics) {
+  vector<unsigned long> candidatetopics = find(query);
+  vector<Topic*> TopicList;
+  while (candidatetopics.size() > 0) {
+    Topic* topic = Topics[candidatetopics.back()];
+    topic->set_dis(dis(query->get_x(), query->get_y(), topic->get_x(), topic->get_y()));
+    TopicList.push_back(topic);
+    candidatetopics.pop_back();
+  }
+
   unsigned long kth = 0;
   int numRes = 0, i = 1;
   unordered_set<unsigned long> result;
@@ -200,6 +343,7 @@ int main(int argc, char** argv) {
   unordered_map<unsigned long, Topic*> Topics;
   unordered_map<unsigned long, Question*> Questions;
   queue<Query*> Queries;
+  Map map;
 
   cin >> numTopics >> numQuestions >> numQueries;
   // Read topics 
@@ -207,7 +351,9 @@ int main(int argc, char** argv) {
   double x = 0, y = 0;
   for (int i = 0; i < numTopics; i++) {
     cin >> id >> x >> y; 
-    Topics.insert(make_pair<unsigned long&, Topic*>(id, new Topic(id, x, y)));
+    Topic* new_topic = new Topic(id, x, y);
+    Topics.insert(make_pair<unsigned long&, Topic*&>(id, new_topic));
+    map.insert(new_topic);
   }
   // Read Questions
   int topicnums;
@@ -230,29 +376,23 @@ int main(int argc, char** argv) {
     Queries.push(query);
   }
 
+//  cout << map << endl;
 //  cout << numTopics << ' ' << numQuestions << ' ' << numQueries << endl;
 //  for (auto it = Topics.begin(); it != Topics.end(); ++it)
 //    cout << it->second;
 //  for (auto it = Questions.begin(); it != Questions.end(); ++it)
 //    cout << it->second;
 
-   // Maintain topiclist
-  vector<Topic*> TopicList;
-  for (auto it = Topics.begin(); it != Topics.end(); ++it)
-    TopicList.push_back(it->second);
-  
   for (int i = 0; i < numQueries; i++) {
     Query* query = Queries.front();
-    for (int i = 0; i < TopicList.size(); i++)
-      TopicList[i]->set_dis(dis(TopicList[i]->get_x(), TopicList[i]->get_y(), query->get_x(), query->get_y()));
     if (query->get_type() == 't') {
-      QueryTopic(query, TopicList);
+      map.QueryTopic(query, Topics);
     } else if (query->get_type() == 'q') {
-      QueryQuestion(query, Questions, TopicList);
+      map.QueryQuestion(query, Questions, Topics);
     }
     Queries.pop();
   }
- 
+
   return 0;
 }
 
