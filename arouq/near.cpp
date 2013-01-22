@@ -90,9 +90,10 @@ ostream& operator<<(ostream& out, Query* query) {
 class Map {
   unordered_map<unsigned long, vector<unsigned long>*> grid;
   size_t size;
+  double offset;
 public:
-  Map(size_t csize): size(csize) {}
-  Map(): size(1000) {}
+  Map(size_t csize): size(csize), offset(1000000.0 / size) { cout << offset<< endl;}
+  Map(): size(500), offset(1000000.0 / size) {}
   ~Map() {}
   void insert(Topic* topic);
   unsigned long xy2index(double x, double y);
@@ -167,12 +168,10 @@ vector<unsigned long> Map::find(Query *query) {
         vector<unsigned long> list = *grid[curindex];
         for (int i = 0; i < list.size(); i++) {
           foundtopics.push_back(list[i]);
-//          cout << list[i] << endl;
         }
       }
     }
     // add new circle
-//    cout << "add new circle" << endl;
     circle2queue(destindex, ++extend, gridindex); 
   }
   return foundtopics;
@@ -181,15 +180,17 @@ vector<unsigned long> Map::find(Query *query) {
 ostream& operator<< (ostream& out, Map& map) {
   for (auto it = map.grid.begin(); it != map.grid.end(); it++) {
     vector<unsigned long> list = *it->second;
+    cout << it->first << endl;
     for (int i = 0; i < list.size(); i++)
       cout << list[i] << ' ';
+    cout << endl;
   }
   cout << endl;
 }
 
 unsigned long Map::xy2index(double x, double y) {
-  unsigned long xindex = round(x / size) * size;
-  unsigned long yindex = round(y / size) * size;
+  unsigned long xindex = round(x / offset);
+  unsigned long yindex = round(y / offset);
   return xindex * size + yindex;
 }
 
@@ -206,12 +207,9 @@ void Map::insert(Topic* topic) {
   }
 }
 
-
-
 inline double Map::dis(double x1, double y1, double x2, double y2) {
   return sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2));
 }
-
 
 int Map::partition(vector<Topic*>& topic, int p, int r) {
   Topic* pivot = topic[r];
@@ -247,7 +245,7 @@ void Map::QueryTopic(Query* query, unordered_map<unsigned long, Topic*> Topics) 
     candidatetopics.pop_back();
   }
 
-//  cout << TopicList.size() << endl;
+//  cout << "Candidata Topic: " << TopicList.size() << endl;
 
   unsigned long kth = 0;
   priority_queue<unsigned long> result_local;
@@ -278,11 +276,13 @@ void Map::QueryTopic(Query* query, unordered_map<unsigned long, Topic*> Topics) 
   }
 
   int resultnum = min(query->get_results(), (int)result_queue.size());
-  for (int i = 0; i < resultnum; i++) {
-    cout << result_queue.front() << ' ';
-    result_queue.pop();
+  if (resultnum > 0) {
+    for (int i = 0; i < resultnum; i++) {
+      cout << result_queue.front() << ' ';
+      result_queue.pop();
+    }
+    cout << endl;
   }
-  cout << endl;
 }
 
 void Map::QueryQuestion(Query* query, unordered_map<unsigned long, Question*>& Questions,
@@ -331,11 +331,13 @@ void Map::QueryQuestion(Query* query, unordered_map<unsigned long, Question*>& Q
   }
 
   int resultnum = min(query->get_results(), (int)result_queue.size());
-  for (int i = 0; i < resultnum; i++) {
-    cout << result_queue.front() << ' ';
-    result_queue.pop();
+  if (resultnum > 0) {
+    for (int i = 0; i < resultnum; i++) {
+      cout << result_queue.front() << ' ';
+      result_queue.pop();
+    }
+    cout << endl;
   }
-  cout << endl;
 }
 
 int main(int argc, char** argv) {
@@ -343,7 +345,7 @@ int main(int argc, char** argv) {
   unordered_map<unsigned long, Topic*> Topics;
   unordered_map<unsigned long, Question*> Questions;
   queue<Query*> Queries;
-  Map map;
+  Map map(50);
 
   cin >> numTopics >> numQuestions >> numQueries;
   // Read topics 
@@ -383,6 +385,7 @@ int main(int argc, char** argv) {
 //  for (auto it = Questions.begin(); it != Questions.end(); ++it)
 //    cout << it->second;
 
+//  cout << "response" << endl;
   for (int i = 0; i < numQueries; i++) {
     Query* query = Queries.front();
     if (query->get_type() == 't') {
