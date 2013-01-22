@@ -63,7 +63,7 @@ size_t getBuffer(size_t srcTower, size_t desTower) {
 
 void hanoi(size_t n, size_t srcTower, size_t desTower) {
   size_t bufTower = getBuffer(srcTower, desTower);
-//  cout << n << ' ' << srcTower << ' ' << desTower << endl;
+  cout << n << ' ' << srcTower << ' ' << desTower << endl;
   if (n == 1) {
     int item = tower[srcTower].pop();
     if (item < tower[desTower].peek() || tower[desTower].empty()) {
@@ -74,7 +74,7 @@ void hanoi(size_t n, size_t srcTower, size_t desTower) {
   }
   else {
     hanoi(n-1, srcTower, bufTower);
-    hanoi(1, srcTower, desTower);
+    hanoi(n, srcTower, desTower);
     hanoi(n-1, bufTower, desTower);
   }
 }
@@ -82,18 +82,18 @@ void hanoi(size_t n, size_t srcTower, size_t desTower) {
 int main() {
   tower[0].push(5);
   tower[0].push(4);
-  tower[0].push(3);
-  tower[0].push(2);
-  tower[0].push(1);
+  tower[1].push(3);
+  tower[1].push(2);
+  tower[2].push(1);
   hanoi(5, 0, 2);
-  cout << "Tower 1" << endl;
-  while (!tower[0].empty())
-    cout << tower[0].pop() << endl;
-  cout << "Tower 2" << endl;
-  while (!tower[1].empty())
-    cout << tower[1].pop() << endl;
-  cout << "Tower 3" << endl;
-  while (!tower[2].empty())
-    cout << tower[2].pop() << endl;  
+//  cout << "Tower 1" << endl;
+//  while (!tower[0].empty())
+//    cout << tower[0].pop() << endl;
+//  cout << "Tower 2" << endl;
+//  while (!tower[1].empty())
+//    cout << tower[1].pop() << endl;
+//  cout << "Tower 3" << endl;
+//  while (!tower[2].empty())
+//    cout << tower[2].pop() << endl;  
   return 0;
 }
