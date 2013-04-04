@@ -31,7 +31,7 @@ int main() {
   keymap.insert(pair<char, string>('w', "9"));
   keymap.insert(pair<char, string>('x', "99"));
   keymap.insert(pair<char, string>('y', "999"));
-  keymap.insert(pair<char, string>('z', "999"));
+  keymap.insert(pair<char, string>('z', "9999"));
   keymap.insert(pair<char, string>(' ', "0"));
 
   int N;
