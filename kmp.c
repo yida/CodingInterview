@@ -1,4 +1,5 @@
 /* http://jakeboxer.com/blog/2009/12/13/the-knuth-morris-pratt-algorithm-in-my-own-words/ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,8 +29,10 @@ int kmp_search(char *orig_str, char *match_str) {
     partial_match_table(match_str, pmt, match_len);
 
     int idx = 0, sub_idx = 0;
+    /* if not matched, shift partial match table number */
     for (; sub_idx < match_len && idx <= (orig_len - match_len);
             idx = (sub_idx != 0)? idx + (sub_idx - pmt[sub_idx - 1]) : idx + 1)
+        /* element-wise compare */
         for (sub_idx = 0; (strncmp(orig_str + idx + sub_idx, match_str + sub_idx, 1) == 0)
                 && sub_idx < match_len; sub_idx++);
     free(pmt);
