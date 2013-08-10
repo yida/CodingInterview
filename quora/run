@@ -1,0 +1,9 @@
+#!/bin/bash
+
+#cat nearby_set | ./nearby
+cat nearby_big_set | ./nearby
+#cat set2 | ./nearby
+#cat set6 | ./nearby
+#cat set8 | ./nearby
+#cat set3 | ./nearby
+#cat set4 | ./nearby
