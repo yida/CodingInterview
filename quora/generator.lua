@@ -2,11 +2,6 @@ T = 10000
 Q = 1000
 N = 10000
 
-T = 5000
-Q = 500
-N = 5000
-
-
 math.randomseed(os.time())
 range = 1000000.0
 print(T..' '..Q..' '..N)
