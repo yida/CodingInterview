@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cassert>
 #include <queue>
+#include <functional>
 
 using namespace std;
 
@@ -28,18 +29,22 @@ class Question {
     void set_id(int id) { this->id = id; }
     void set_topic(int t_id) { topics.push_back(t_id); }
     friend ostream& operator<<(ostream& out, Question &question);
-    friend bool question_compare(Question * t1, Question * t2);
     void set_distance(float dis) { this->distance = dis; }
     float get_distance(void) { return distance; }
 };
 
-// t1 < t2 ?
-bool question_compare(Question * t1, Question * t2) {
-  if (fabs(t1->distance - t2->distance) <= 0.001) {
-    return t1->id > t2->id;
-  } else
-    return t1->distance < t2->distance;
-}
+class compare_question {
+  public:
+    bool operator()(Question* q1, Question* q2) {
+      if (abs(q1->get_distance() - q2->get_distance()) <= 0.001) {
+//        cout << "same sign " << q1->get_id() << ' ' << q2->get_id() << endl;
+        return q1->get_id() > q2->get_id();
+      } else {
+//        cout << "not same sign" << endl;
+        return q1->get_distance() < q2->get_distance();
+      }
+    }
+};
 
 ostream& operator<<(ostream& out, Question &question) {
   out << "ID: " << question.id << endl;
@@ -73,24 +78,15 @@ class Topic {
     float get_distance(void) { return distance; }
     void set_distance(float dis) { this->distance = dis; }
     friend ostream& operator<<(ostream& out, Topic &topic);
-    friend bool topic_compare(Topic * t1, Topic * t2);
 };
-
-// t1 < t2 ?
-bool topic_compare(Topic * t1, Topic * t2) {
-  if (fabs(t1->distance - t2->distance) <= 0.001) {
-    return t1->id > t2->id;
-  } else
-    return t1->distance < t2->distance;
-}
 
 class compare_topic {
   public:
-    bool operator() (Topic* t1, Topic* t2) {
+    bool operator()(Topic* t1, Topic* t2) {
       if (fabs(t1->get_distance() - t2->get_distance()) <= 0.001) {
-        return t2->get_id() > t1->get_id();
+        return t1->get_id() > t2->get_id();
       } else
-        return t2->get_distance() > t1->get_distance();
+        return t1->get_distance() < t2->get_distance();
     }
 };
 
@@ -209,19 +205,24 @@ void KD_Tree::nn_search(Tree_Node * head, float * point, int max_num, int depth,
       head->get_data()->set_distance(distance);
       topic_list.push_back(head->get_data());
       push_heap(topic_list.begin(), topic_list.end());
+      make_heap(topic_list.begin(), topic_list.end(), compare_topic());
     } else if (topic_list.size() < max_num) {
       // insert maximum of point whenever possible
       distance = get_distance(point, head->get_data()->get_dims());
       head->get_data()->set_distance(distance);
       topic_list.push_back(head->get_data());
       push_heap(topic_list.begin(), topic_list.end());
+      make_heap(topic_list.begin(), topic_list.end(), compare_topic());
     } else {
       distance = get_distance(point, head->get_data()->get_dims());
       if (distance < topic_list.front()->get_distance()) {
+        head->get_data()->set_distance(distance);
         pop_heap(topic_list.begin(), topic_list.end());
         topic_list.pop_back();
+        make_heap(topic_list.begin(), topic_list.end(), compare_topic());
         topic_list.push_back(head->get_data());
         push_heap(topic_list.begin(), topic_list.end());
+        make_heap(topic_list.begin(), topic_list.end(), compare_topic());
       }
     }
   } else {
@@ -268,12 +269,15 @@ void KD_Tree::nn_search(Tree_Node * head, float * point, int max_num, int depth,
     if (question_list.empty()) {
       distance = get_distance(point, head->get_data()->get_dims());
       questions = head->get_data()->get_questions();
+//      cout << "init " << head->get_data()->get_id() << ' ' << distance << endl;
       for (it = questions->begin(); it != questions->end(); it ++) {
         (*it)->set_distance(distance);
+//        cout << "insert " << (*it)->get_id() << ' ' << (*it)->get_distance() << endl;
         // insert to unique id set
         unique_question_id.insert((*it)->get_id());
         question_list.push_back((*it));
         push_heap(question_list.begin(), question_list.end());
+        make_heap(question_list.begin(), question_list.end(), compare_question());
       }
     } else if (question_list.size() < max_num) {
       distance = get_distance(point, head->get_data()->get_dims());
@@ -282,35 +286,50 @@ void KD_Tree::nn_search(Tree_Node * head, float * point, int max_num, int depth,
         if ((*it)->get_distance() > distance) (*it)->set_distance(distance);
         if ((unique_it = unique_question_id.find((*it)->get_id())) == unique_question_id.end()) {
           // insert to unique id set if not presented
+//          cout << "insert extend " << (*it)->get_id() << ' ' << (*it)->get_distance() << endl;
           unique_question_id.insert((*it)->get_id());
           question_list.push_back((*it));
           push_heap(question_list.begin(), question_list.end());
+          make_heap(question_list.begin(), question_list.end(), compare_question());
         }
       }
-      make_heap(question_list.begin(), question_list.end(), question_compare);
     } else {
       distance = get_distance(point, head->get_data()->get_dims());
       // update question distance
       questions = head->get_data()->get_questions();
       for (it = questions->begin(); it != questions->end(); it ++) {
-        if ((*it)->get_distance() > distance) (*it)->set_distance(distance);
+        if ((*it)->get_distance() > distance) {
+//          cout << "update " << (*it)->get_id() << ' ' << distance << endl;
+          (*it)->set_distance(distance);
+        }
       }
-      make_heap(question_list.begin(), question_list.end(), question_compare);
+      make_heap(question_list.begin(), question_list.end(), compare_question());
 
       // update question_list
       for (it = questions->begin(); it != questions->end(); it ++) {
-        if (distance < question_list.front()->get_distance()) {
+        if ((*it)->get_distance() <= question_list.front()->get_distance()) {
           // only insert new one
           if ((unique_it = unique_question_id.find((*it)->get_id())) == unique_question_id.end()) {
             // remove the front in heap
+//            cout << "remove extend update" << question_list.front()->get_id() << ' ' <<  question_list.front()->get_distance() << endl;
+//            for (int i = 0; i < question_list.size(); i ++)
+//              cout << question_list[i]->get_id() <<  ' ';
+//            cout << endl;
             unique_question_id.erase(question_list.front()->get_id());
             pop_heap(question_list.begin(), question_list.end());
             question_list.pop_back();
+            make_heap(question_list.begin(), question_list.end(), compare_question());
             // insert node
+//            cout << "insert extend update" << (*it)->get_id() << ' ' << (*it)->get_distance() << endl;
             unique_question_id.insert((*it)->get_id());
             question_list.push_back((*it));
             push_heap(question_list.begin(), question_list.end());
+            make_heap(question_list.begin(), question_list.end(), compare_question());
+          } else {
+//            cout << (*it)->get_id() << " exists" << endl;
           }
+        } else {
+//          cout << "not insert " << distance << ' ' << (*it)->get_id() << ' ' << question_list.front()->get_distance() << endl;
         }
       }
     }
@@ -347,7 +366,6 @@ void KD_Tree::knn_search(float * point, int max_num, vector<Question *>& questio
 }
 
 void KD_Tree::erase(Topic * node) {
-//  cout << node->get_id() << endl;
   Tree_Node * head = root;
   Tree_Node * parent = root;
   if (!root) { 
@@ -366,7 +384,6 @@ void KD_Tree::erase(Topic * node) {
   }
 
   if (head->get_data()->get_id() != node->get_id()) {
-//    cout  << "not match " << head->get_data()->get_id() << endl;
     return;
   } else {
     if (!parent->get_left()) {
@@ -466,7 +483,7 @@ int main(int argc, char ** argv) {
   float x = 0, y = 0;
   for (int t_counter = 0; t_counter < T; t_counter ++) {
     cin >> id >> x >> y; 
-    topics.insert(make_pair<int, Topic>(id, Topic(id, x, y)));
+    topics[id] = Topic(id, x, y);
     kd_tree.insert(&topics[id]);
   }
 
@@ -475,10 +492,11 @@ int main(int argc, char ** argv) {
   map<int, Question> questions;
   for (int q_counter = 0; q_counter < Q; q_counter ++) {
     cin >> id >> Qn;
-    questions.insert(make_pair<int, Question>(id, Question(id))); 
+    questions[id] = Question(id); 
     for (int qn_counter = 0; qn_counter < Qn; qn_counter ++) {
       cin >> tid;
       questions[id].set_topic(tid);
+
       topics[tid].set_question(&questions[id]);
     }
   }
@@ -489,21 +507,39 @@ int main(int argc, char ** argv) {
   float query_dim[K];
    
   vector<Topic *> topic_list;
-  make_heap(topic_list.begin(), topic_list.end(), topic_compare);
+  make_heap(topic_list.begin(), topic_list.end(), compare_topic());
   vector<Question *> question_list;
-  make_heap(question_list.begin(), question_list.end(), question_compare);
+  make_heap(question_list.begin(), question_list.end(), compare_question());
   for (int n_counter = 0; n_counter < N; n_counter++) {
     cin >> query_type >> max_query_id >> query_dim[0] >> query_dim[1]; 
     if (query_type == 't') {
       topic_list.clear();
       kd_tree.knn_search(query_dim, max_query_id, topic_list);
-      reverse(topic_list.begin(), topic_list.end());
-      cout << topic_list;
+      make_heap(topic_list.begin(), topic_list.end(), compare_topic());
+      sort_heap(topic_list.begin(), topic_list.end(), compare_topic());
+      for (int counter = 0; counter < max_query_id; counter ++)
+        cout << topic_list[counter]->get_id() << ' ' << topic_list[counter]->get_distance() << endl;
+      cout << endl;
     } else {
+//      cout << kd_tree;
       question_list.clear();
+//      questions[0].set_distance(276581);
+//      question_list.push_back(&questions[0]);
+//      push_heap(question_list.begin(), question_list.end());
+//      cout << question_list.front()->get_id() << endl;
+//      questions[15].set_distance(276581);
+//      question_list.push_back(&questions[15]);
+//      push_heap(question_list.begin(), question_list.end());
+//      make_heap(question_list.begin(), question_list.end(), compare_question());
+//      cout << question_list.front()->get_id() << endl;
+
       kd_tree.knn_search(query_dim, max_query_id, question_list);
-      sort_heap(question_list.begin(), question_list.end(), question_compare);
-      cout << question_list;
+      make_heap(question_list.begin(), question_list.end(), compare_question());
+      sort_heap(question_list.begin(), question_list.end(), compare_question());
+      for (int counter = 0; counter < max_query_id; counter ++)
+//        cout << question_list[counter]->get_id() << ' ' << question_list[counter]->get_distance() << endl;
+        cout << question_list[counter]->get_id() << ' ';
+      cout << endl;
     }
   }
 

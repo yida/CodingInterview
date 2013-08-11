@@ -2,6 +2,10 @@ T = 10000
 Q = 1000
 N = 10000
 
+T = 20
+Q = 20
+N = 8
+
 math.randomseed(os.time())
 range = 1000000.0
 print(T..' '..Q..' '..N)
@@ -16,8 +20,17 @@ end
 for i = 1, Q do
   topics = math.random(11) - 1
   io.write((i - 1)..' '..topics)
-  for i = 1, topics do
-    io.write(' '..math.random(T + 1) - 1)
+  unique_topic = {}
+  topic_container = {}
+  while (#topic_container < topics) do
+    rand_id = math.random(T) - 1
+    if not unique_topic[rand_id] then
+      topic_container[#topic_container + 1] = rand_id
+      unique_topic[rand_id] = 1;
+    end
+  end
+  for i = 1, #topic_container do
+    io.write(' '..topic_container[i])
   end
   io.write('\n')
 end
@@ -26,10 +39,10 @@ for i = 1, N do
   query_type_id = math.random(2)
   if query_type_id == 1 then
     query_type = 't'
-    query_num = math.random(math.min(10, T) + 1) - 1
+    query_num = math.random(math.min(10, T) - 1)
   else
     query_type = 'q'
-    query_num = math.random(math.min(100, Q) + 1) - 1
+    query_num = math.random(math.min(100, Q) - 1)
   end
   x = math.random() * range;
   y = math.random() * range;  
