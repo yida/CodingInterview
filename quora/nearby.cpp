@@ -14,7 +14,7 @@ using namespace std;
 
 const int K = 2;
 
-const float max_w = 1e6 * 1e6;
+const float max_w = 1e6 * sqrt(2);
 
 // Question class
 class Question {
@@ -137,11 +137,22 @@ class Tree_Node {
         assert(dim_num < K);
         this->dim[dim_num] = dim; 
     }
+    void set_rectangle_value(const float value, const int index) {
+        assert(index < K * 2);
+        this->rectangle[index] = value;
+    }
+    void set_rectangle(const float x1, const float y1, const float x2, const float y2) {
+      rectangle[0] = x1;
+      rectangle[1] = y1;
+      rectangle[2] = x2;
+      rectangle[3] = y2;
+    }
 
     Topic * get_data(void) const { return data; };
     const float get_dim(int dim_num) const { assert(dim_num < K); return dim[dim_num]; }
     const float * get_dims(void) const { return dim; }
     const int get_dim_order() const { return dim_order; }
+    const float get_rectangle(int index) const { assert(index < 2 * K); return rectangle[index]; } 
     Tree_Node * get_left(void) const { return left; }
     Tree_Node * get_right(void) const { return right; }
   
@@ -149,6 +160,7 @@ class Tree_Node {
   private:
     Topic * data;  
     float dim[2];
+    float rectangle[4]; // diagnal, x1, y1, x2, y2
     int dim_order;
     Tree_Node * left;
     Tree_Node * right;
@@ -197,11 +209,16 @@ ostream& operator<<(ostream &out, KD_Tree & kd_tree) {
     if (node->get_data()) {
       out << "leaf: " << "Topic " << node->get_data()->get_id();
       out << " dim1 " << node->get_data()->get_dim(0);
-      out << " dim2 " << node->get_data()->get_dim(1) << endl;
+      out << " dim2 " << node->get_data()->get_dim(1);
+      out << " rec " << node->get_rectangle(0) << ' ' << node->get_rectangle(1) << ' '
+          << node->get_rectangle(2) << ' ' << node->get_rectangle(3);
+      out << endl;
     } else { 
       out << "non-leaf: " << "split ";
       for (int dim_counter = 0; dim_counter < K; dim_counter++)
-        out << node->get_dim(dim_counter) << ' ';
+        out << node->get_dim(dim_counter);
+      out << " rec " << node->get_rectangle(0) << ' ' << node->get_rectangle(1) << ' '
+          << node->get_rectangle(2) << ' ' << node->get_rectangle(3);
       cout << " dim_order " << node->get_dim_order() << endl;
     }
     if (node->get_left())
@@ -530,7 +547,10 @@ void KD_Tree::erase(Topic * node) {
 void KD_Tree::insert(Topic * node) {
   // initially, create a root node
   int depth = 0;
-  if (!root) root = new Tree_Node();
+  if (!root) { 
+    root = new Tree_Node();
+    root->set_rectangle(0.0, 0.0, 1000000.0, 1000000.0);
+  }
   Tree_Node * head = root;
   Tree_Node * parent = root;
 
@@ -563,10 +583,23 @@ void KD_Tree::insert(Topic * node) {
     head->set_dim_order(dim);
     Tree_Node * left_node = new Tree_Node;
     Tree_Node * right_node = new Tree_Node;
+
+    int other_dim = (depth + 1) % K;
+    left_node->set_rectangle_value(head->get_rectangle(0), 0);
+    left_node->set_rectangle_value(head->get_rectangle(1), 1);
+    left_node->set_rectangle_value(split, dim + 2);
+    left_node->set_rectangle_value(head->get_rectangle(other_dim + 2), other_dim + 2);
+    
+    right_node->set_rectangle_value(head->get_rectangle(other_dim + 2), other_dim + 2);
+    right_node->set_rectangle_value(split, dim);
+    right_node->set_rectangle_value(head->get_rectangle(2), 2);
+    right_node->set_rectangle_value(head->get_rectangle(3), 3);
+
     for (int dim_counter = 0; dim_counter < K; dim_counter++) {
       left_node->set_dim(head->get_dim(dim_counter), dim_counter);
       right_node->set_dim(head->get_dim(dim_counter), dim_counter);
     }
+
     if (node->get_dim(dim) <= split) {
       left_node->set_data(node);
       right_node->set_data(head->get_data());
@@ -654,6 +687,7 @@ int main(int argc, char ** argv) {
         cout << topic_list[counter]->get_id() << ' ';
       }
       cout << endl;
+      cout << kd_tree;
 //      kd_tree.export_tree();
     } else {
       t1 = clock();
