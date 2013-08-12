@@ -1,9 +1,19 @@
 #!/bin/bash
 
-time cat nearby_set | ./nearby
+#time cat nearby_set | ./nearby
 #cat nearby_big_set | ./nearby
 #cat set2 | ./nearby
 #cat set6 | ./nearby
 #cat set8 | ./nearby
 #cat set3 | ./nearby
 #time cat set5 | ./nearby
+
+#for i in {1..100}
+#do
+#  lua generator.lua > set3
+  echo "train"
+  time lua force.lua set3 > result1
+  echo "test"
+  time cat set3 | ./nearby > result2
+  diff result1 result2
+#done

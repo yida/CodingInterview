@@ -1,5 +1,5 @@
 debug = true 
-debug = false
+--debug = false
 
 filename = arg[1]
 
@@ -112,15 +112,16 @@ function question_query(num, x, y)
   while (topic_idx <= #Topic and #ques_unique <= num) do
     for i = 1, #Topic[topic_idx].questions do
       ques_id = Topic[topic_idx].questions[i]
-      if not ques_unique[ques_id + 1] then
-        ques_unique[ques_id + 1] = Questions[ques_id + 1]
-        ques_unique[ques_id + 1].distance = Topic[topic_idx].distance
+      if not ques_unique[tostring(ques_id)] then
+        ques_unique[tostring(ques_id)] = Questions[ques_id + 1]
+        ques_unique[tostring(ques_id)].distance = Topic[topic_idx].distance
       end
     end
     topic_idx = topic_idx + 1
   end
   ques = {}
   for k, v in pairs(ques_unique) do
+--    print(k, v)
     ques[#ques + 1] = v
   end
 
@@ -129,6 +130,7 @@ function question_query(num, x, y)
 --  end
 
   ques = merge_sort(ques, 1, #ques, math.floor((1 + #ques) / 2))
+--  print(#ques, num)
   for i = 1, math.min(num, #ques) do
 --  for i = 1, #ques do
     if debug then

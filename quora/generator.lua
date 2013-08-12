@@ -2,9 +2,13 @@ T = 10000
 Q = 1000
 N = 10000
 
-T = 20
-Q = 20
-N = 8
+T = 1000
+Q = 500
+N = 200
+
+T = 10
+Q = 5
+N = 2
 
 math.randomseed(os.time())
 range = 1000000.0
