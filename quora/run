@@ -12,8 +12,8 @@
 #do
 #  lua generator.lua > set3
   echo "train"
-  time lua force.lua set7 > result1
+  time lua force.lua set6 > result1
   echo "test"
-  time cat set7 | ./nearby > result2
+  time cat set6 | ./nearby > result2
   diff result1 result2
 #done

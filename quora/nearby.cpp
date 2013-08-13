@@ -29,6 +29,7 @@ class Question {
 
     int get_id() const { return id; }
     float get_distance(void) const { return distance; }
+    const bool less_than(const Question* q2);
   private:
     friend ostream& operator<<(ostream& out, Question &question);
 
@@ -51,6 +52,13 @@ class compare_question {
 ostream& operator<<(ostream& out, const Question &question) {
   out << "ID: " << question.get_id() << endl;
   return out;
+}
+
+const bool Question::less_than(const Question* q2) {
+  if (fabs(this->distance - q2->get_distance()) <= 0.001) {
+    return this->id > q2->get_id();
+  } else
+    return this->distance < q2->get_distance();
 }
 
 // Topic class
@@ -119,6 +127,28 @@ ostream& operator<<(ostream& out, const Topic &topic) {
   return out;
 }
 
+template<typename T>
+ostream& operator<<(ostream& out, vector<T *> &list) {
+  for (int counter = 0; counter < list.size(); counter ++)
+    out << list[counter]->get_id() << ':' << list[counter]->get_distance() << ' '; // << list[counter]->get_distance() << endl;
+  out << endl;
+}
+
+template<typename T>
+ostream& operator<<(ostream& out, deque<T *> &list) {
+  for (int counter = 0; counter < list.size(); counter ++)
+    out << list[counter]->get_id() << ' ';
+  out << endl;
+}
+
+template<typename T, class T_Compare>
+ostream& operator<<(ostream& out, priority_queue<T *, vector<T *>, T_Compare> &list) {
+  while (!list.empty() > 0) {
+    out << list.top()->get_id() << ' ';
+    list.pop();
+  }
+}
+
 class Tree_Node {
   public:
     Tree_Node() : data(NULL), dim_order(-1), left(NULL), right(NULL) {
@@ -152,7 +182,8 @@ class Tree_Node {
     const float get_dim(int dim_num) const { assert(dim_num < K); return dim[dim_num]; }
     const float * get_dims(void) const { return dim; }
     const int get_dim_order() const { return dim_order; }
-    const float get_rectangle(int index) const { assert(index < 2 * K); return rectangle[index]; } 
+    const float get_rectangle_value(int index) const { assert(index < 2 * K); return rectangle[index]; } 
+    const float * get_rectangle(void) const { return rectangle; }
     Tree_Node * get_left(void) const { return left; }
     Tree_Node * get_right(void) const { return right; }
   
@@ -191,6 +222,9 @@ class KD_Tree {
                    set<int>& unique_question_id, set<Question *>& selected_id);
     void knn_search(const float * point, const int max_num, vector<Topic *>& topic_list);
     void knn_search(const float * point, const int max_num, vector<Question *>& question_list);
+    const bool circle_rectangle_intersect(const float * center, const float radius, const float * rectangle);
+    const bool line_circle_intersect(const float * center, const float radius, const float x1, const float y1,
+                                     const float x2, const float y2) const;
     void export_tree();
   private:
     float get_distance(const float * point1, const float * point2);
@@ -210,15 +244,15 @@ ostream& operator<<(ostream &out, KD_Tree & kd_tree) {
       out << "leaf: " << "Topic " << node->get_data()->get_id();
       out << " dim1 " << node->get_data()->get_dim(0);
       out << " dim2 " << node->get_data()->get_dim(1);
-      out << " rec " << node->get_rectangle(0) << ' ' << node->get_rectangle(1) << ' '
-          << node->get_rectangle(2) << ' ' << node->get_rectangle(3);
+      out << " rec " << node->get_rectangle_value(0) << ' ' << node->get_rectangle_value(1) << ' '
+          << node->get_rectangle_value(2) << ' ' << node->get_rectangle_value(3);
       out << endl;
     } else { 
       out << "non-leaf: " << "split ";
       for (int dim_counter = 0; dim_counter < K; dim_counter++)
         out << node->get_dim(dim_counter);
-      out << " rec " << node->get_rectangle(0) << ' ' << node->get_rectangle(1) << ' '
-          << node->get_rectangle(2) << ' ' << node->get_rectangle(3);
+      out << " rec " << node->get_rectangle_value(0) << ' ' << node->get_rectangle_value(1) << ' '
+          << node->get_rectangle_value(2) << ' ' << node->get_rectangle_value(3);
       cout << " dim_order " << node->get_dim_order() << endl;
     }
     if (node->get_left())
@@ -308,7 +342,7 @@ void KD_Tree::nn_search(const Tree_Node * head, const float * point, const int m
       // initiate queue with closest point
       distance = get_distance(point, head->get_data()->get_dims());
       head->get_data()->set_distance(distance);
-      cout << "init " << head->get_data()->get_id() << endl;
+//      cout << "init " << head->get_data()->get_id() << endl;
       selected_id.insert(head->get_data());
       topic_list.push_back(head->get_data());
     } else if (topic_list.size() < max_num) {
@@ -316,11 +350,11 @@ void KD_Tree::nn_search(const Tree_Node * head, const float * point, const int m
       distance = get_distance(point, head->get_data()->get_dims());
       selected_id.insert(head->get_data());
       head->get_data()->set_distance(distance);
-      cout << "extend " << head->get_data()->get_id() << endl;
+//      cout << "extend " << head->get_data()->get_id() << endl;
       topic_list.push_back(head->get_data());
 
       if (topic_list.size() == max_num) {
-        cout << "sort once " << endl;
+//        cout << "sort once " << endl;
         sort(topic_list.begin(), topic_list.end(), compare_topic());
       }
     } else {
@@ -329,13 +363,13 @@ void KD_Tree::nn_search(const Tree_Node * head, const float * point, const int m
         head->get_data()->set_distance(distance);
         selected_id.insert(head->get_data());
       }
-      cout << head->get_data()->get_id() << ' ' << topic_list.back()->get_id();
-      cout << head->get_data()->get_distance() << ' ' << topic_list.back()->get_distance() << endl;
-      cout << endl;
+//      cout << head->get_data()->get_id() << ' ' << topic_list.back()->get_id();
+//      cout << head->get_data()->get_distance() << ' ' << topic_list.back()->get_distance() << endl;
+//      cout << endl;
 
       if (!head->get_data()->less_than(topic_list.back())) {
         topic_list.pop_back();
-        cout << "update " << head->get_data()->get_id() << endl;
+//        cout << "update " << head->get_data()->get_id() << endl;
         topic_list.push_back(head->get_data());
         sort(topic_list.begin(), topic_list.end(), compare_topic());
       } else {
@@ -347,33 +381,99 @@ void KD_Tree::nn_search(const Tree_Node * head, const float * point, const int m
     if (topic_list.size() < max_num)
       radius = max_w;
     else
-      radius = topic_list.front()->get_distance();
-    // prune area not in range
-    if (head->get_dim(dim) > (point[dim] - radius) && 
-        head->get_dim(dim) < (point[dim] + radius)) {
-      if (point[dim] <= head->get_dim(dim)) {
-        nn_search(head->get_left(), point, max_num, depth + 1, topic_list, selected_id);
-        nn_search(head->get_right(), point, max_num, depth + 1, topic_list, selected_id);
-      } else {
-        nn_search(head->get_right(), point, max_num, depth + 1, topic_list, selected_id);
-        nn_search(head->get_left(), point, max_num, depth + 1, topic_list, selected_id);
-      } 
-    } else if (head->get_dim(dim) <= (point[dim] - radius)) {
-        nn_search(head->get_right(), point, max_num, depth + 1, topic_list, selected_id);
-//        print_leaf(head->get_left());
-//        cout << "ignore left " << head->get_dim(dim) << ' ' << point[dim] - radius
-//                                                     << ' ' << point[dim] + radius << ' ';
-//        cout << head->get_dim((depth + 1)%K) << ' ' << point[(depth + 1) % K] - radius << ' '
-//             << point[(depth + 1) % K] + radius << endl;
+      radius = topic_list.back()->get_distance();
 
-    } else if (head->get_dim(dim) >= (point[dim] + radius)) {
+    // prune area not in range
+    bool left_intersected = circle_rectangle_intersect(point, radius, head->get_left()->get_rectangle());
+    if (not left_intersected)
+      cout << "left prune " << endl;
+    bool right_intersected = circle_rectangle_intersect(point, radius, head->get_right()->get_rectangle());
+    if (not right_intersected)
+      cout << "right prune " << endl;
+
+    if (point[dim] <= head->get_dim(dim)) {
+      if (left_intersected)
         nn_search(head->get_left(), point, max_num, depth + 1, topic_list, selected_id);
-//        print_leaf(head->get_right());
-//        cout << "ignore right " << head->get_dim(dim) << ' ' << point[dim] - radius 
-//                                                      << ' ' << point[dim] + radius << endl;
+      if (right_intersected)
+        nn_search(head->get_right(), point, max_num, depth + 1, topic_list, selected_id);
     } else {
-    }
+      if (right_intersected)
+        nn_search(head->get_right(), point, max_num, depth + 1, topic_list, selected_id);
+      if (left_intersected)
+        nn_search(head->get_left(), point, max_num, depth + 1, topic_list, selected_id);
+    } 
   }
+}
+
+const bool KD_Tree::line_circle_intersect(const float * center, const float radius, const float x1, 
+                                          const float y1, const float x2, const float y2) const {
+  float dx = x2 - x1;
+  float dy = y2 - y1;
+  float dr = sqrt(dx * dx + dy * dy);
+  float D = x1 * y2 - x2 * y1;
+  float delta = radius * radius * dr * dr - D * D;
+  cout << "delta " << delta << endl;
+  return delta >= 0;
+}
+
+const bool KD_Tree::circle_rectangle_intersect(const float * center, const float radius,
+                                               const float * rectangle) {
+//  cout << center[0] << ' ' << center[1] << ' ' << radius; 
+//  cout << ' ' << rectangle[0] << ' ' << rectangle[1] << ' ' << rectangle[2] << ' ' << rectangle[3] << endl;
+//  cout << endl;
+  // circle center inside rectangle
+  if ((center[0] <= rectangle[1]) && (center[0] >= rectangle[0]) &&
+      (center[1] <= rectangle[3]) && (center[1] >= rectangle[2])) {
+    cout << "center inside " << ' ';
+    cout << center[0] << ' ' << center[1] << ' ' << radius; 
+    cout << ' ' << rectangle[0] << ' ' << rectangle[1] << ' ' << rectangle[2] << ' ' << rectangle[3] << endl;
+
+    return true;
+  }
+  // one of four side rectangle intersect with circle
+  float x1 = rectangle[0];
+  float y1 = rectangle[1];
+  float x2 = rectangle[2];
+  float y2 = rectangle[3];
+  // (x1, y1), (x1, y2)
+  if (line_circle_intersect(center, radius, x1, y1, x1, y2)) {
+    cout << "side intersect 1 " << ' ';
+    cout << center[0] << ' ' << center[1] << ' ' << radius; 
+    cout << ' ' << rectangle[0] << ' ' << rectangle[1] << ' ' << rectangle[2] << ' ' << rectangle[3] << endl;
+    return true;
+  }
+  // (x1, y2), (x2, y2)
+  if (line_circle_intersect(center, radius, x1, y2, x2, y2)) {
+    cout << "side intersect 2 " << ' ';
+    cout << center[0] << ' ' << center[1] << ' ' << radius; 
+    cout << ' ' << rectangle[0] << ' ' << rectangle[1] << ' ' << rectangle[2] << ' ' << rectangle[3] << endl;
+    return true;
+  }
+  // (x2, y1) (x2, y2)
+  if (line_circle_intersect(center, radius, x2, y1, x2, y2)) {
+    cout << "side intersect 3 " << ' ';
+    cout << center[0] << ' ' << center[1] << ' ' << radius; 
+    cout << ' ' << rectangle[0] << ' ' << rectangle[1] << ' ' << rectangle[2] << ' ' << rectangle[3] << endl;
+    return true;
+  }
+  // (x1, y1) (x2, y1)
+  if (line_circle_intersect(center, radius, x1, y1, x2, y1)) {
+    cout << "side intersect 4 " << ' ';
+    cout << center[0] << ' ' << center[1] << ' ' << radius; 
+    cout << ' ' << rectangle[0] << ' ' << rectangle[1] << ' ' << rectangle[2] << ' ' << rectangle[3] << endl;
+    return true;
+  }
+    
+  // all points in circle
+  if ((fabs(center[0] - x1) <= radius && fabs(center[1] - y1) <= radius) && 
+     (fabs(center[0] - x1) <= radius && fabs(center[1] - y2) <= radius) && 
+     (fabs(center[0] - x2) <= radius && fabs(center[1] - y2) <= radius) && 
+     (fabs(center[0] - x2) <= radius && fabs(center[1] - y1) <= radius)) {
+    cout << "all points in circle" << endl;
+    return true; 
+  }
+  
+  return false;
 }
 
 void KD_Tree::knn_search(const float * point, const int max_num, vector<Topic *>& topic_list) {
@@ -381,11 +481,11 @@ void KD_Tree::knn_search(const float * point, const int max_num, vector<Topic *>
   nn_search(root, point, max_num, 0, topic_list, selected_id);
   sort(topic_list.begin(), topic_list.end(), compare_topic());
 
-  int length = min(max_num, static_cast<int>(topic_list.size()));
-  for (int counter = 0; counter < length; counter ++) {
-    cout << topic_list[counter]->get_id() << ':' 
-         << topic_list[counter]->get_distance() << endl;
-  }
+//  int length = min(max_num, static_cast<int>(topic_list.size()));
+//  for (int counter = 0; counter < length; counter ++) {
+//    cout << topic_list[counter]->get_id() << ':' 
+//         << topic_list[counter]->get_distance() << endl;
+//  }
 
   for (set<Topic *>::iterator it = selected_id.begin(); it != selected_id.end(); it ++) {
     (*it)->set_distance(max_w);
@@ -408,10 +508,13 @@ void KD_Tree::nn_search(const Tree_Node * head, const float * point, const int m
         (*it)->set_distance(distance);
         selected_id.insert(*it);
         // insert to unique id set
+//        cout << "init insert " << (*it)->get_id() << endl;
         unique_question_id.insert((*it)->get_id());
         question_list.push_back((*it));
-        push_heap(question_list.begin(), question_list.end());
-        make_heap(question_list.begin(), question_list.end(), compare_question());
+      }
+
+      if (question_list.size() >= max_num) {
+        sort(question_list.begin(), question_list.end(), compare_question());
       }
     } else if (question_list.size() < max_num) {
       distance = get_distance(point, head->get_data()->get_dims());
@@ -425,9 +528,12 @@ void KD_Tree::nn_search(const Tree_Node * head, const float * point, const int m
           // insert to unique id set if not presented
           unique_question_id.insert((*it)->get_id());
           question_list.push_back((*it));
-          push_heap(question_list.begin(), question_list.end());
-          make_heap(question_list.begin(), question_list.end(), compare_question());
+//          cout << "extend insert " << (*it)->get_id() << endl;
         }
+      }
+      
+      if (question_list.size() >= max_num) {
+        sort(question_list.begin(), question_list.end(), compare_question());
       }
     } else {
       distance = get_distance(point, head->get_data()->get_dims());
@@ -439,30 +545,30 @@ void KD_Tree::nn_search(const Tree_Node * head, const float * point, const int m
           selected_id.insert(*it);
         }
       }
-      make_heap(question_list.begin(), question_list.end(), compare_question());
+      sort(question_list.begin(), question_list.end(), compare_question());
+
 
       // update question_list
       for (it = questions->begin(); it != questions->end(); it ++) {
-        if ((*it)->get_distance() <= question_list.front()->get_distance()) {
+        if ((unique_it = unique_question_id.find((*it)->get_id())) == unique_question_id.end()) {
+          if ((*it)->less_than(question_list.back())) {
           // only insert new one
-          if ((unique_it = unique_question_id.find((*it)->get_id())) == unique_question_id.end()) {
+ //           cout << question_list;
             // remove the front in heap
-            if ((*it)->get_distance() < question_list.front()->get_distance()) {
-              unique_question_id.erase(question_list.front()->get_id());
-              pop_heap(question_list.begin(), question_list.end());
-              question_list.pop_back();
-              make_heap(question_list.begin(), question_list.end(), compare_question());
-            }
+//            cout << "erase " << question_list.back()->get_id() << endl;
+            unique_question_id.erase(question_list.back()->get_id());
+            question_list.pop_back();
             // insert node
             unique_question_id.insert((*it)->get_id());
             question_list.push_back((*it));
-            push_heap(question_list.begin(), question_list.end());
-            make_heap(question_list.begin(), question_list.end(), compare_question());
-          } else {
+            sort(question_list.begin(), question_list.end(), compare_question());
+//            cout << "update insert " << (*it)->get_id() << endl;
           }
         } else {
         }
       }
+      sort(question_list.begin(), question_list.end(), compare_question());
+      
     }
   } else {
     int dim = depth % K;
@@ -470,29 +576,38 @@ void KD_Tree::nn_search(const Tree_Node * head, const float * point, const int m
     if (question_list.size() < max_num)
       radius = max_w;
     else
-      radius = question_list.front()->get_distance();
+      radius = question_list.back()->get_distance();
     // prune area not in range
-    if (head->get_dim(dim) >= (point[dim] - radius) && 
-        head->get_dim(dim) <= (point[dim] + radius)) {
-      if (point[dim] <= head->get_dim(dim)) {
-          nn_search(head->get_left(), point, max_num, depth + 1, question_list, 
-                    unique_question_id, selected_id);
-          nn_search(head->get_right(), point, max_num, depth + 1, question_list, 
-                    unique_question_id, selected_id);
-      } else {
-          nn_search(head->get_right(), point, max_num, depth + 1, question_list, 
-                    unique_question_id, selected_id);
-          nn_search(head->get_left(), point, max_num, depth + 1, question_list, 
-                    unique_question_id, selected_id);
-      }
-    } else if (head->get_dim(dim) < (point[dim] - radius)) {
-        nn_search(head->get_right(), point, max_num, depth + 1, question_list, 
-                  unique_question_id, selected_id);
-    } else if (head->get_dim(dim) > (point[dim] + radius)) {
+    bool left_intersected = circle_rectangle_intersect(point, radius, 
+                                                  head->get_left()->get_rectangle());
+    if (not left_intersected) 
+      cout << "left pruned" << endl;
+    bool right_intersected = circle_rectangle_intersect(point, radius, 
+                                             head->get_right()->get_rectangle());
+    if (not right_intersected) 
+      cout << "right pruned" << endl;
+
+    if (point[dim] <= head->get_dim(dim)) {
+      if (left_intersected)
         nn_search(head->get_left(), point, max_num, depth + 1, question_list, 
                   unique_question_id, selected_id);
+      if (right_intersected)
+        nn_search(head->get_right(), point, max_num, depth + 1, question_list, 
+                  unique_question_id, selected_id);
+      else 
+        cout << "pruned" << endl;
     } else {
-    }
+      if (right_intersected)
+        nn_search(head->get_right(), point, max_num, depth + 1, question_list, 
+                  unique_question_id, selected_id);
+      else 
+        cout << "pruned" << endl;
+      if (left_intersected)
+        nn_search(head->get_left(), point, max_num, depth + 1, question_list, 
+                  unique_question_id, selected_id);
+      else 
+        cout << "pruned" << endl;
+    } 
   }
 }
 
@@ -501,8 +616,8 @@ void KD_Tree::knn_search(const float * point, const int max_num,
   set<int> unique_question_id;
   set<Question *> selected_id;
   nn_search(root, point, max_num, 0, question_list, unique_question_id, selected_id); 
-  make_heap(question_list.begin(), question_list.end(), compare_question());
-  sort_heap(question_list.begin(), question_list.end(), compare_question());
+  sort(question_list.begin(), question_list.end(), compare_question());
+
   for (set<Question *>::iterator it = selected_id.begin(); it != selected_id.end(); it ++) {
     (*it)->set_distance(max_w);
   }
@@ -585,15 +700,15 @@ void KD_Tree::insert(Topic * node) {
     Tree_Node * right_node = new Tree_Node;
 
     int other_dim = (depth + 1) % K;
-    left_node->set_rectangle_value(head->get_rectangle(0), 0);
-    left_node->set_rectangle_value(head->get_rectangle(1), 1);
+    left_node->set_rectangle_value(head->get_rectangle_value(0), 0);
+    left_node->set_rectangle_value(head->get_rectangle_value(1), 1);
     left_node->set_rectangle_value(split, dim + 2);
-    left_node->set_rectangle_value(head->get_rectangle(other_dim + 2), other_dim + 2);
+    left_node->set_rectangle_value(head->get_rectangle_value(other_dim + 2), other_dim + 2);
     
-    right_node->set_rectangle_value(head->get_rectangle(other_dim + 2), other_dim + 2);
+    right_node->set_rectangle_value(head->get_rectangle_value(other_dim + 2), other_dim + 2);
     right_node->set_rectangle_value(split, dim);
-    right_node->set_rectangle_value(head->get_rectangle(2), 2);
-    right_node->set_rectangle_value(head->get_rectangle(3), 3);
+    right_node->set_rectangle_value(head->get_rectangle_value(2), 2);
+    right_node->set_rectangle_value(head->get_rectangle_value(3), 3);
 
     for (int dim_counter = 0; dim_counter < K; dim_counter++) {
       left_node->set_dim(head->get_dim(dim_counter), dim_counter);
@@ -613,27 +728,7 @@ void KD_Tree::insert(Topic * node) {
   }
 }
 
-template<typename T>
-ostream& operator<<(ostream& out, vector<T *> &list) {
-  for (int counter = 0; counter < list.size(); counter ++)
-    out << list[counter]->get_id() << ' '; // << list[counter]->get_distance() << endl;
-  out << endl;
-}
 
-template<typename T>
-ostream& operator<<(ostream& out, deque<T *> &list) {
-  for (int counter = 0; counter < list.size(); counter ++)
-    out << list[counter]->get_id() << ' ';
-  out << endl;
-}
-
-template<typename T, class T_Compare>
-ostream& operator<<(ostream& out, priority_queue<T *, vector<T *>, T_Compare> &list) {
-  while (!list.empty() > 0) {
-    out << list.top()->get_id() << ' ';
-    list.pop();
-  }
-}
 
 int main(int argc, char ** argv) {
   KD_Tree kd_tree;
@@ -672,7 +767,6 @@ int main(int argc, char ** argv) {
    
   clock_t t1, t2;
   vector<Topic *> topic_list;
-//  make_heap(topic_list.begin(), topic_list.end(), compare_topic());
   vector<Question *> question_list;
   make_heap(question_list.begin(), question_list.end(), compare_question());
   for (int n_counter = 0; n_counter < N; n_counter++) {
@@ -687,7 +781,7 @@ int main(int argc, char ** argv) {
         cout << topic_list[counter]->get_id() << ' ';
       }
       cout << endl;
-      cout << kd_tree;
+//      cout << kd_tree;
 //      kd_tree.export_tree();
     } else {
       t1 = clock();

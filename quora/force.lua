@@ -1,5 +1,5 @@
 debug = true 
---debug = false
+debug = false
 
 filename = arg[1]
 
