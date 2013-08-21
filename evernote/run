@@ -18,8 +18,10 @@
 #  diff result1 result2
 #done
 
-lua ques3.lua > set1
-time cat set1 | ./ques3
+#lua ques3.lua > set1
+#time cat set1 | ./ques3
 #time lua ques3_run.lua set1 > result2
 #diff result1 result2
+
+time cat ques1_set | ./ques1
 
