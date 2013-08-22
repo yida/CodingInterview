@@ -110,7 +110,12 @@ void RTree::insert(Leaf* new_leaf) {
     // enlarge directory rectangle with bottom-right point of new leaf
     root->directory_rectangle->enlarge(mbbox->x + mbbox->w, mbbox->y + mbbox->h);
   }
-   
+  Node* head = root;   
+  // traverse R-tree top-down
+  while (!head->children.empty()) {
+
+  }
+
 }
 
 int main() {
