@@ -26,6 +26,7 @@ class BoundingBox {
     const float area() const { return w * h; }
     const bool contain(const BoundingBox& bbox) const ;
     void enlarge(const float x1, const float y1);
+    void enlarge(const BoundingBox* pbbox);
 
     friend ostream& operator<<(ostream& out, BoundingBox& bbox);
     
@@ -90,9 +91,20 @@ void BoundingBox::enlarge(const float x1, const float y1) {
   const float y_array[] = {y, y + h, y1};
   vector<float> x_array_vec(x_array, x_array + 3);
   vector<float> y_array_vec(y_array, y_array + 3);
-  cout << x << ' ' << y << endl;
+  // cout << "before " << x << ' ' << y << endl;
   min_bounding_rectangle(x_array_vec, y_array_vec, &x, &y, &w, &h);
-  cout << x << ' ' << y << endl;
+  // cout << "after " << x << ' ' << y << endl;
+}
+
+void BoundingBox::enlarge(const BoundingBox* pbbox) {
+//  cout << x << ' ' << y << ' ' << pbbox->x << ' ' << pbbox->y << endl;
+  const float x_array[] = {x, x + w, pbbox->x, pbbox->x + pbbox->w};
+  const float y_array[] = {y, y + h, pbbox->y, pbbox->y + pbbox->h};
+  vector<float> x_array_vec(x_array, x_array + 4);
+  vector<float> y_array_vec(y_array, y_array + 4);
+  // cout << "before " << x << ' ' << y << endl;
+  min_bounding_rectangle(x_array_vec, y_array_vec, &x, &y, &w, &h);
+  // cout << "after " << x << ' ' << y << endl;
 }
 
 const float BoundingBox::enlargement(const float x1, const float y1) const {
@@ -141,15 +153,17 @@ void Node::insert_leaf(Leaf* leaf) {
   // push leaf to leaves
   this->leaves.push_back(leaf);
   // enlarge the directory_rectangle
-  this->directory_rectangle->enlarge(leaf->min_bounding_box->x,
-                                     leaf->min_bounding_box->y); 
+//  BoundingBox* mbbox = leaf->min_bounding_box;
+//  this->directory_rectangle->enlarge(mbbox); 
 //  cout << "push " << leaf->id << endl;
 }
 
 void Node::quadratic_split(Leaf* new_leaf, vector<Node*> parents) {
   //  cout << "add extra " << new_leaf->id << endl;
   // first insert new leaf and enlarge
-  this->insert_leaf(new_leaf);
+//  this->insert_leaf(new_leaf);
+  this->leaves.push_back(new_leaf);
+  this->directory_rectangle->enlarge(new_leaf->min_bounding_box);
   
   // find most separated seed s1, s2
   float new_x = 0, new_y = 0, new_w = 0, new_h = 0;
@@ -164,9 +178,11 @@ void Node::quadratic_split(Leaf* new_leaf, vector<Node*> parents) {
       BoundingBox::min_bounding_rectangle(
           *(*it1)->min_bounding_box, *(*it2)->min_bounding_box, 
           &new_x, &new_y, &new_w, &new_h); 
+
       integral_area = new_w * new_h - 
-                      (*it1)->min_bounding_box->area() + 
+                      (*it1)->min_bounding_box->area() -
                       (*it2)->min_bounding_box->area();
+      // cout << integral_area << endl;
       if (integral_area > max_integral_area) {
         max_integral_area = integral_area;
         left_seed = it1;
@@ -176,21 +192,24 @@ void Node::quadratic_split(Leaf* new_leaf, vector<Node*> parents) {
   }
   // cout << "most separated seeds " << (*left_seed)->id << ' '
   //                                 << (*right_seed)->id << endl;
+  // cout << "max area " << max_integral_area << endl;
+//  cout << "left seed " << *(*left_seed)->min_bounding_box << endl;
+//  cout << "right seed " << *(*right_seed)->min_bounding_box << endl;
   // split the leaf node  
 
   // create new left and right node with left and right seed x, y
   Node* left_node = new Node((*left_seed)->min_bounding_box->x,
-                             (*right_seed)->min_bounding_box->y);
+                             (*left_seed)->min_bounding_box->y);
   Node* right_node = new Node((*right_seed)->min_bounding_box->x,
                               (*right_seed)->min_bounding_box->y);
   // push left and right seed 
   left_node->leaves.push_back(*left_seed);
   right_node->leaves.push_back(*right_seed);
+
   while (!this->leaves.empty()) {
     Leaf* current_leaf = this->leaves.back();
     if (this->leaves.back() != (*left_seed) && 
         this->leaves.back() != (*right_seed)) {
-//      cout << "push " << current_leaf->id << endl; 
       BoundingBox* left_mbbox = left_node->directory_rectangle;
       BoundingBox* right_mbbox = right_node->directory_rectangle;
       float left_enlargement = left_mbbox->enlargement(
@@ -201,50 +220,76 @@ void Node::quadratic_split(Leaf* new_leaf, vector<Node*> parents) {
           current_leaf->min_bounding_box->y);
       if (left_enlargement < right_enlargement) {
         // insert to left node
-        left_node->insert_leaf(current_leaf);
+        left_node->leaves.push_back(current_leaf);
+//        cout << "insert left enlarge " << endl;
       } else if (left_enlargement > right_enlargement) {
         // insert to right node
-        right_node->insert_leaf(current_leaf);
+        right_node->leaves.push_back(current_leaf);
+//        cout << "insert right enlarge " << endl;
       } else {
         // same enlargement, choose with smaller area 
         if (left_mbbox->area() < right_mbbox->area()) {
           // insert to left node
-          left_node->insert_leaf(current_leaf);
+          left_node->leaves.push_back(current_leaf);
+//          cout << "insert left area " << endl;
         } else if (left_mbbox->area() > right_mbbox->area()) {
           // insert to right node
-          right_node->insert_leaf(current_leaf);
+          right_node->leaves.push_back(current_leaf);
+//          cout << "insert right area " << endl;
         } else {
           // same area, choose with fewer element
           if (left_node->leaves.size() <= right_node->leaves.size()) {
             // insert to left node
-            left_node->insert_leaf(current_leaf);
+            left_node->leaves.push_back(current_leaf);
+//            cout << "insert left element " << endl;
           } else {
             // insert to right node
-            right_node->insert_leaf(current_leaf);
+            right_node->leaves.push_back(current_leaf);
+//            cout << "insert right element " << endl;
           }
         }
       }
     } 
     this->leaves.pop_back();
   }
-  
+  // enlarge left node
+  for (deque<Leaf*>::iterator it_left = left_node->leaves.begin() + 1;
+      it_left != left_node->leaves.end(); it_left ++) {
+    //    cout << "left " << *(*it_left)->min_bounding_box << endl;
+    left_node->directory_rectangle->enlarge((*it_left)->min_bounding_box);
+    //    cout << *left_node->directory_rectangle << endl;
+  }
+  // enlarge right node
+  for (deque<Leaf*>::iterator it_right = right_node->leaves.begin() + 1;
+      it_right != right_node->leaves.end(); it_right ++) {
+    //    cout << "right " << *(*it_right)->min_bounding_box << endl;
+    right_node->
+        directory_rectangle->enlarge((*it_right)->min_bounding_box);
+    //    cout << *right_node->directory_rectangle << endl;
+  }
+ 
   if (!parents.back()) { // current head is top root
-//    cout << "separate parent" << endl;
+    //    cout << "separate parent" << endl;
     this->children.push_back(left_node);
     this->children.push_back(right_node); 
+    this->directory_rectangle->enlarge(left_node->directory_rectangle);
+    this->directory_rectangle->enlarge(right_node->directory_rectangle);
   } else {
     // insert to parents' children list
-//    cout << "split root" << endl;
+    //    cout << "split root" << endl;
     Node* parent = parents.back();
     deque<Node*>::iterator it = parent->children.begin();
-    // iterate to find the current node in the parent's list
+    // linearly iterate to find the current node in the parent's list
     for (; (*it) != this && it != parent->children.end(); it ++);
 //    cout << this->directory_rectangle->area() << endl;
 //    cout << (*it)->directory_rectangle->area() << endl;
+
     // remove the current node and insert two new nodes
     parent->children.erase(it); 
     parent->children.push_back(left_node);
     parent->children.push_back(right_node);
+    parent->directory_rectangle->enlarge(left_node->directory_rectangle);
+    parent->directory_rectangle->enlarge(right_node->directory_rectangle);
   }
   
 //  cout << max_integral_area << ' ' << (*left_seed)->id << ' ' 
@@ -299,10 +344,12 @@ ostream& operator<<(ostream& out, RTree& tree) {
 
 void RTree::insert(Leaf* new_leaf) 
 {
+  // cout << "new leaf " << *new_leaf->min_bounding_box << endl;
+
   BoundingBox* mbbox = new_leaf->min_bounding_box;
   if (!root) 
   {
-//    cout << "new leaf init " << new_leaf->id << endl;
+    // cout << "new leaf init " << new_leaf->id << endl;
     // init root with top-left point of new leaf
     root = new Node(mbbox->x, mbbox->y);
     // enlarge directory rectangle with bottom-right point of new leaf
@@ -314,18 +361,24 @@ void RTree::insert(Leaf* new_leaf)
   Node* head = root;   
   vector<Node *> parent_stack(1, NULL);
   // traverse R-tree top-down
+  Node* next_head = NULL;
   while (!head->children.empty()) {
-    deque<Node*>::iterator it_children = head->children.begin();
+    // cout << "iterate top-down" << endl;
     parent_stack.push_back(head);
     bool found_match = false;
     // first searching node whode DR contains the mbb of new leaf
+    // cout << "children size " << head->children.size() << endl;
+    deque<Node*>::iterator it_children = head->children.begin();
     for (; it_children != head->children.end(); it_children ++) {
+      // cout << "iterare DRs " << endl; 
       if ((*it_children)->directory_rectangle->
                           contain(*new_leaf->min_bounding_box)) {
-        head = *it_children;
+        next_head = *it_children;
         found_match = true;
       }
     }
+
+    // cout << "DR contains match " << found_match << endl;
     // otherwise choose the node with minimal enlargement of the DR
     if (!found_match) {
       deque<Node*>::iterator it_min_enlargement = head->children.begin();
@@ -347,16 +400,29 @@ void RTree::insert(Leaf* new_leaf)
           } 
         }
       }
-      head = *it_min_enlargement;
+      next_head = *it_min_enlargement;
     }
+    head = next_head;
   }
+  // cout << "head " << *head->directory_rectangle << endl;
 
   // check if the leaf node is not full
   if (head->leaves.size() < max_children) {
 //    cout << "new leaf insert " << new_leaf->id << endl;
-    head->insert_leaf(new_leaf);
+//    head->insert_leaf(new_leaf);
+    head->leaves.push_back(new_leaf);
+    head->directory_rectangle->enlarge(new_leaf->min_bounding_box);
+    Node* parent = parent_stack.back();
+    // enlarge all parents
+    while (parent) {
+      parent->directory_rectangle->enlarge(head->directory_rectangle); 
+      parent_stack.pop_back();
+      head = parent;
+      parent = parent_stack.back();
+    }
   } else {
     // Quadratic split
+//    cout << "quadratic split " << endl;
     head->quadratic_split(new_leaf, parent_stack);
     // recursive split parent
     head = parent_stack.back();
@@ -384,7 +450,7 @@ int main()
   size_t id = 0;
   float x = 0, y = 0;
 //  for (size_t topic_counter = 0; topic_counter < T; topic_counter ++) {
-  for (size_t topic_counter = 0; topic_counter < 2; topic_counter ++) {
+  for (size_t topic_counter = 0; topic_counter < 10; topic_counter ++) {
     cin >> id >> x >> y;
     topics[id] = new Leaf(id, x, y);
     topic_tree.insert(topics[id]);
