@@ -7,6 +7,7 @@
 #include <cassert>
 #include <unordered_map>
 #include <limits>
+#include <list>
 
 using namespace std;
 
@@ -26,7 +27,9 @@ class BoundingBox {
     const float enlargement(const float x1, const float y1) const;
     const float enlargement(const BoundingBox* pbbox) const;
     const float area() const { return w * h; }
+    const float distance_from(const float x1, const float y1) const;
     const bool contain(const BoundingBox& bbox) const ;
+    const bool contain(const float x1, const float y1) const ;
     void enlarge(const float x1, const float y1);
     void enlarge(const BoundingBox* pbbox);
 
@@ -42,6 +45,19 @@ ostream& operator<<(ostream& out, BoundingBox& bbox) {
   out << "x: " << bbox.x << " y: " << bbox.y;
   out << " w: " << bbox.w << " h: " << bbox.h; 
   return out;
+}
+
+const float BoundingBox::distance_from(const float x1, 
+                                       const float y1) const {
+  float center_x = x + w / 2;
+  float center_y = y + h / 2;
+  return sqrt((center_x - x1) * (center_x - x1) + 
+              (center_y - y1) * (center_y - y1));
+}
+
+const bool BoundingBox::contain(const float x1, const float y1) const {
+  float increased_area = this->enlargement(x1, y1);
+  return increased_area == 0;
 }
 
 const bool BoundingBox::contain(const BoundingBox& bbox) const {
@@ -177,6 +193,13 @@ class Node {
     deque<Leaf*> leaves;
 };
 
+class compare_node_pair {
+  public:
+    const bool operator()(const pair<float, Node*>& p1, 
+                          const pair<float, Node*>& p2) const {
+      return p1.first < p2.first;
+    }
+};
 
 void Node::insert_leaf(Leaf* leaf) {
   // push leaf to leaves
@@ -518,6 +541,10 @@ class RTree
     ~RTree() {}
 
     void insert(Leaf* new_left);
+    void search(const Node* head, const float query_x, const float query_y,
+                const size_t max_query_id, vector<Leaf*>& list);
+    void nsearch(const float query_x, const float query_y,
+                 const size_t max_query_id, vector<Leaf*>& list);
 
   private:
     friend ostream& operator<<(ostream& out, RTree& tree);
@@ -678,6 +705,75 @@ void RTree::insert(Leaf* new_leaf)
   }
 }
 
+void RTree::search(const Node* head, const float query_x,
+    const float query_y, const size_t max_query_id, vector<Leaf*>& list) {
+  // found leave node
+  if (head->children.empty()) {
+     
+  } else {
+    bool found_match = false;
+    Node* next_head = NULL;
+    
+    deque<pair<float, Node*> > contain_list;
+    deque<pair<float, Node*> > noncontain_list;
+
+    float area = numeric_limits<float>::max();
+    float distance_to_center = 0;
+    // iterate to find children contains the point
+    deque<Node*>::const_iterator it_children = head->children.begin();
+    for (; it_children != head->children.end(); it_children ++) {
+      // if bbox contains points, sort by area : small to large
+      if ((*it_children)->directory_rectangle->contain(query_x, query_y)) {
+        area = (*it_children)->directory_rectangle->area();
+        contain_list.push_back(pair<float, Node*>(area, *it_children));
+      } else {
+      // else sort by distance 
+        distance_to_center = (*it_children)->
+            directory_rectangle->distance_from(query_x, query_y);
+        noncontain_list.push_back(pair<float, Node*>(
+            distance_to_center, *it_children));
+      }
+    }
+    sort(contain_list.begin(), contain_list.end(), compare_node_pair());
+    // cout << "contain " << contain_list.size() << endl;
+    // for (size_t index = 0; index < contain_list.size(); index ++) {
+    //   cout << contain_list[index].first << ' ';
+    // }
+    // cout << endl;
+    sort(noncontain_list.begin(), noncontain_list.end(),
+        compare_node_pair());
+    // cout << "noncontain " << noncontain_list.size() << endl;
+    // for (size_t index = 0; index < noncontain_list.size(); index ++) {
+    //   cout << noncontain_list[index].first << ' ';
+    // }
+    // cout << endl;
+
+    // next level search selected children
+    search(contain_list.front().second, query_x, query_y, 
+        max_query_id, list);
+    contain_list.pop_front();
+    // search remain children who contains the points
+    while (!contain_list.empty() && list.size() <= max_query_id) {
+      search(contain_list.front().second, query_x, query_y, 
+          max_query_id, list);
+      contain_list.pop_front();
+    }
+    // search remain children who does not contain the points
+    while (!noncontain_list.empty() && list.size() <= max_query_id) {
+      search(noncontain_list.front().second, query_x, query_y, 
+          max_query_id, list);
+      noncontain_list.pop_front();
+    }    
+  }
+}
+
+void RTree::nsearch(const float query_x, const float query_y,
+                   const size_t max_query_id, vector<Leaf*>& list) {
+  // cout << query_x << ' ' << query_y << ' ' << max_query_id << endl;
+  if (!root) return;   
+  search(root, query_x, query_y, max_query_id, list);
+}
+
 int main() 
 {
   typedef unordered_map<size_t, Leaf*> LeafMap;
@@ -696,7 +792,7 @@ int main()
     topic_tree.insert(topics[id]);
   }
   //  cout << "insert topic tree" << endl;
-  cout << topic_tree << endl;
+  //  cout << topic_tree << endl;
 
   RTree question_tree;
   LeafMap questions;
@@ -723,6 +819,25 @@ int main()
   }
   // cout << "insert question tree" << endl;
   // cout << question_tree << endl;
+
+  char query_type = '0';
+  size_t max_query_id = 0;
+  float query_x = 0, query_y = 0;
+  vector<Leaf*> topic_list;
+  vector<Leaf*> question_list;
+//  for (int n_counter = 0; n_counter < N; n_counter++) {
+  for (int n_counter = 0; n_counter < 1; n_counter++) {
+    cin >> query_type >> max_query_id >> query_x >> query_y; 
+    if (query_type == 't') {
+      // topic_tree
+      topic_list.clear();
+      topic_tree.nsearch(query_x, query_y, max_query_id, topic_list);
+    } else if (query_type == 'q') {
+      // question_tree
+      question_list.clear();
+      question_tree.nsearch(query_x, query_y, max_query_id, question_list);
+    }
+  }
 
   ////////////////////////////////////////
   // for (LeafMap::iterator it = topics.begin();
