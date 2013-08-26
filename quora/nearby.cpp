@@ -14,7 +14,9 @@ using namespace std;
 class BoundingBox {
   public:
     explicit BoundingBox(const float input_x, const float input_y)
-        : x(input_x), y(input_y), w(0.0), h(0.0) {}
+        : x(input_x), y(input_y), w(0.0), h(0.0) { 
+      vertices.push_back(pair<float, float>(x, y));
+    }
     ~BoundingBox() {}
 
     static void min_bounding_rectangle(const vector<float>& x_array, 
@@ -39,6 +41,7 @@ class BoundingBox {
     float y;
     float w;
     float h;
+    vector<pair<float, float> > vertices;
 };
 
 ostream& operator<<(ostream& out, BoundingBox& bbox) {
@@ -798,8 +801,7 @@ int main()
   LeafMap questions;
   size_t topic_number = 0, topic_id;
   for (size_t question_counter = 0; question_counter < Q;
-      question_counter ++) 
-  {
+      question_counter ++) {
     cin >> id >> topic_number;
     if (topic_number > 0) {
       cin >> topic_id;
@@ -813,8 +815,11 @@ int main()
         topic_mbbox = topics[topic_id]->min_bounding_box;
         BoundingBox* question_mbbox = questions[id]->min_bounding_box;
         question_mbbox->enlarge(topic_mbbox);
+        question_mbbox->vertices.push_back(pair<float, float>(
+            topics[topic_id]->min_bounding_box->vertices.back().first,
+            topics[topic_id]->min_bounding_box->vertices.back().second));
       }
-      question_tree.insert(questions[id]); 
+      question_tree.insert(questions[id]);
     }
   }
   // cout << "insert question tree" << endl;
@@ -825,9 +830,9 @@ int main()
   float query_x = 0, query_y = 0;
   vector<Leaf*> topic_list;
   vector<Leaf*> question_list;
-//  for (int n_counter = 0; n_counter < N; n_counter++) {
+  //  for (int n_counter = 0; n_counter < N; n_counter++) {
   for (int n_counter = 0; n_counter < 1; n_counter++) {
-    cin >> query_type >> max_query_id >> query_x >> query_y; 
+    cin >> query_type >> max_query_id >> query_x >> query_y;
     if (query_type == 't') {
       // topic_tree
       topic_list.clear();
@@ -848,9 +853,11 @@ int main()
   // cout << "questions " << endl;
   // for (LeafMap::iterator it = questions.begin();
   //     it != questions.end(); it ++) {
-  //   cout << it->first << ' ' << it->second->min_bounding_box->area();
-  //   cout << ' ' << it->second->min_bounding_box->x;
-  //   cout << ' ' << it->second->min_bounding_box->y << endl;
+  // //  cout << it->first << ' ' << it->second->min_bounding_box->area();
+  // //  cout << ' ' << it->second->min_bounding_box->x;
+  // //  cout << ' ' << it->second->min_bounding_box->y << endl;
+  //   cout << it->second->id << ' ';
+  //   cout << it->second->min_bounding_box->vertices.size() << endl;
   // }
   ////////////////////////////////////////
  
