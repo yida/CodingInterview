@@ -11,6 +11,8 @@
 
 using namespace std;
 
+const float MAX_DISTANCE = 1e6 * 1e6;
+
 class BoundingBox {
   public:
     explicit BoundingBox(const float input_x, const float input_y)
@@ -29,7 +31,9 @@ class BoundingBox {
     const float enlargement(const float x1, const float y1) const;
     const float enlargement(const BoundingBox* pbbox) const;
     const float area() const { return w * h; }
-    const float distance_from(const float x1, const float y1) const;
+    const float actual_distance(const float x1, const float y1) const;
+    const float min_distance(const float x1, const float y1) const;
+    const float min_max_distance(const float x1, const float y1) const;
     const bool contain(const BoundingBox& bbox) const ;
     const bool contain(const float x1, const float y1) const ;
     void enlarge(const float x1, const float y1);
@@ -50,12 +54,52 @@ ostream& operator<<(ostream& out, BoundingBox& bbox) {
   return out;
 }
 
-const float BoundingBox::distance_from(const float x1, 
-                                       const float y1) const {
-  float center_x = x + w / 2;
-  float center_y = y + h / 2;
-  return sqrt((center_x - x1) * (center_x - x1) + 
-              (center_y - y1) * (center_y - y1));
+const float BoundingBox::actual_distance(const float x1, 
+                                         const float y1) const {
+  float min_distance = numeric_limits<float>::max();
+  float distance = 0;
+  for (vector<pair<float, float> >::const_iterator it = vertices.begin();
+      it != vertices.end(); it ++) {
+    distance = sqrt(((*it).first - x1) * ((*it).first - x1) + 
+                ((*it).second - y1) * ((*it).second - y1));
+    if (distance < min_distance) min_distance = distance;
+  } 
+  return min_distance;
+}
+
+const float BoundingBox::min_distance(const float x1,
+                                      const float y1) const {
+  // if point(x1, y1) in REC, min_dist = 0, otherwise
+  // distance to closest edge or vertex
+  float x_rectangle = x1;
+  float y_rectangle = y1;
+  if (x1 < x) x_rectangle = x;
+  else if (x1 > (x + w)) x_rectangle = x + w;
+  if (y1 < y) y_rectangle = y;
+  else if (y1 > (y + h)) y_rectangle = y + h; 
+  return sqrt((x1 - x_rectangle) * (x1 - x_rectangle) + 
+         (y1 - y_rectangle) * (y1 - y_rectangle));
+}
+
+const float BoundingBox::min_max_distance(const float x1,
+                                          const float y1) const {
+  // mim over all dimension distance from point to the furthest
+  // point of the closest face of the R
+
+  float x_min = 0, y_min = 0, x_max = 0, y_max = 0;
+  // x dimension
+  if (x1 < (x + w / 2)) x_min = x;
+  else x_min = x + w;
+  if (y1 < (y + h / 2)) y_min = y + h;
+  else y_min = y;
+  x_max = sqrt((x_min - x1) * (x_min - x1) + (y_min - y1) * (y_min - y1));
+  // y dimension
+  if (y1 < (y + h / 2)) y_min = y;
+  else y_min = y + h;
+  if (x1 < (x + w / 2)) x_min = x + w;
+  else x_min = x;
+  y_max = sqrt((x_min - x1) * (x_min - x1) + (y_min - y1) * (y_min - y1));
+  return (x_max < y_max)? x_max : y_max;   
 }
 
 const bool BoundingBox::contain(const float x1, const float y1) const {
@@ -165,7 +209,16 @@ class Leaf {
 
     size_t id;
     BoundingBox* min_bounding_box;
+    float min_distance;
+    float min_max_distance;
 };
+
+bool compare_leaf(const Leaf* leaf1, const Leaf* leaf2) {
+  if (fabs(leaf1->min_distance - leaf2->min_distance) < 0.001) {
+    return leaf1->id > leaf2->id; 
+  } else
+    return leaf1->min_distance < leaf2->min_distance;
+}
 
 class Node {
   public:
@@ -194,6 +247,9 @@ class Node {
     BoundingBox* directory_rectangle;
     deque<Node*> children;
     deque<Leaf*> leaves;
+
+    float min_distance;
+    float min_max_distance;
 };
 
 class compare_node_pair {
@@ -203,6 +259,10 @@ class compare_node_pair {
       return p1.first < p2.first;
     }
 };
+
+bool compare_node(const Node* node1, const Node* node2) {
+  return node1->min_max_distance < node2->min_max_distance;
+}
 
 void Node::insert_leaf(Leaf* leaf) {
   // push leaf to leaves
@@ -552,15 +612,16 @@ class RTree
   private:
     friend ostream& operator<<(ostream& out, RTree& tree);
     void print_tree();
+    void print_tree(Node* head);
     Node* root;
     static const size_t max_children;
 };
 
 const size_t RTree::max_children = 4;
 
-void RTree::print_tree() {
+void RTree::print_tree(Node* head) {
   deque<Node*> node_queue;
-  node_queue.push_back(root);
+  node_queue.push_back(head);
 
   size_t layer = 0;
   while (!node_queue.empty()) {
@@ -578,6 +639,10 @@ void RTree::print_tree() {
     layer ++;
     node_queue.pop_front(); 
   }
+}
+
+void RTree::print_tree() {
+  print_tree(root);
 }
 
 ostream& operator<<(ostream& out, RTree& tree) {
@@ -684,25 +749,27 @@ void RTree::insert(Leaf* new_leaf)
     }
   } else {
     // Quadratic split
-//    cout << "before quadratic split " << endl;
-//    print_tree();
+    //    cout << "before quadratic split " << endl;
+    //    print_tree();
     head->quadratic_split(new_leaf, parent_stack);
-//    cout << "after quadratic split " << endl;
-//    print_tree();
+    //    cout << "after quadratic split " << endl;
+    //    print_tree();
 
     // recursive split parent
-    head = parent_stack.back();
+    Node* parent = parent_stack.back();
     parent_stack.pop_back();
-    while (head) {
-      if (head->children.size() > max_children) {
+    while (parent) {
+      if (parent->children.size() > max_children) {
       //  cout << "before quadratic root split " << endl;
       //  print_tree();
       //  cout << "split node " << endl;
-        head->quadratic_split(parent_stack);
+        parent->quadratic_split(parent_stack);
       //  cout << "after quadratic root split " << endl;
       //  print_tree();
       }
-      head = parent_stack.back();
+      parent->directory_rectangle->enlarge(head->directory_rectangle);
+      head = parent;
+      parent = parent_stack.back();
       parent_stack.pop_back();
     } 
   }
@@ -711,62 +778,86 @@ void RTree::insert(Leaf* new_leaf)
 void RTree::search(const Node* head, const float query_x,
     const float query_y, const size_t max_query_id, vector<Leaf*>& list) {
   // found leave node
+  if (!head) cerr << "null head" << endl;
   if (head->children.empty()) {
-     
-  } else {
-    bool found_match = false;
-    Node* next_head = NULL;
+    deque<Leaf*>::const_iterator it_leaves = head->leaves.begin();
     
-    deque<pair<float, Node*> > contain_list;
-    deque<pair<float, Node*> > noncontain_list;
-
-    float area = numeric_limits<float>::max();
-    float distance_to_center = 0;
-    // iterate to find children contains the point
+    for(; it_leaves != head->leaves.end(); it_leaves ++) {
+      (*it_leaves)->min_distance = (*it_leaves)->min_bounding_box->
+          actual_distance(query_x, query_y);
+      (*it_leaves)->min_max_distance = (*it_leaves)->min_bounding_box->
+          min_max_distance(query_x, query_y);
+      // cout << "push " << (*it_leaves)->id << endl;
+      list.push_back(*it_leaves);
+    }
+    
+    if (list.size() >= max_query_id) {
+      sort(list.begin(), list.end(), compare_leaf);
+      // cout << "extra" << endl;
+      while (list.size() > max_query_id) { list.pop_back(); }
+    }  
+  } else {
+    vector<Node*> children_list; 
     deque<Node*>::const_iterator it_children = head->children.begin();
     for (; it_children != head->children.end(); it_children ++) {
-      // if bbox contains points, sort by area : small to large
-      if ((*it_children)->directory_rectangle->contain(query_x, query_y)) {
-        area = (*it_children)->directory_rectangle->area();
-        contain_list.push_back(pair<float, Node*>(area, *it_children));
+      (*it_children)->min_distance = (*it_children)->directory_rectangle
+          ->min_distance(query_x, query_y);
+      (*it_children)->min_max_distance = (*it_children)
+        ->directory_rectangle->min_max_distance(query_x, query_y);
+      children_list.push_back((*it_children));
+    } 
+    sort(children_list.begin(), children_list.end(), compare_node);
+    
+    vector<Node*>::iterator it_list = children_list.begin();
+    vector<Node*>::iterator it_compare = children_list.begin();
+    for (; it_list != children_list.end(); it_list ++) {
+      // if buffer not full, kepp insert
+      if (list.size() < max_query_id) {
+        // cout << "fill buffer" << endl;
+        search(*it_list, query_x, query_y, max_query_id, list); 
       } else {
-      // else sort by distance 
-        distance_to_center = (*it_children)->
-            directory_rectangle->distance_from(query_x, query_y);
-        noncontain_list.push_back(pair<float, Node*>(
-            distance_to_center, *it_children));
+      // prune
+        sort(list.begin(), list.end(), compare_leaf);
+        // cout << "list ";
+        // for (size_t index = 0; index < list.size(); index ++)
+        //   cout << list[index]->id << ':' << list[index]->min_distance << ' ';
+        // cout << endl;
+        // if (list.back()->min_distance > (*it_list)->min_max_distance) {
+        //   // cout << list.back()->min_distance << ' ';
+        //   // cout << (*it_list)->min_max_distance << ' ';
+        //   // cout << "downward pruning" << endl;
+        //   list.pop_back();
+        // }
+        // cout << "list size " << list.size() << endl;
+        if (!list.empty()) {
+          if ((*it_list)->min_distance > list.back()->min_max_distance) {
+              //  if (fabs((*it_list)->min_distance - 72522.9) < 0.1) {
+            // cout << "upward pruning" << endl;
+            // cout << (*it_list)->min_distance << " ";
+            // cout << (*it_list)->min_max_distance << ' ';
+            // cout << list.back()->min_distance << ' ';
+            // cout << list.back()->min_max_distance << endl;
+            //cout << "root " << *head->directory_rectangle << endl;
+            // print_tree(*it_list);
+              //  }
+            continue;
+          }
+        }
+        // for (it_compare = children_list.begin(); it_compare != it_list &&
+        //     it_compare != children_list.end(); it_compare ++) { 
+        //   if ((*it_list)->min_distance > (*it_compare)->min_max_distance) {
+        //     // cout << "downward pruning" << endl;
+        //     continue;
+        //   }
+        // }
+        search(*it_list, query_x, query_y, max_query_id, list); 
       }
-    }
-    sort(contain_list.begin(), contain_list.end(), compare_node_pair());
-    // cout << "contain " << contain_list.size() << endl;
-    // for (size_t index = 0; index < contain_list.size(); index ++) {
-    //   cout << contain_list[index].first << ' ';
+    } 
+      
+    // for (size_t index = 0; index < children_list.size(); index ++) {
+    //   cout << children_list[index]->min_distance << ' ';
+    //   cout << children_list[index]->min_max_distance << endl;
     // }
-    // cout << endl;
-    sort(noncontain_list.begin(), noncontain_list.end(),
-        compare_node_pair());
-    // cout << "noncontain " << noncontain_list.size() << endl;
-    // for (size_t index = 0; index < noncontain_list.size(); index ++) {
-    //   cout << noncontain_list[index].first << ' ';
-    // }
-    // cout << endl;
-
-    // next level search selected children
-    search(contain_list.front().second, query_x, query_y, 
-        max_query_id, list);
-    contain_list.pop_front();
-    // search remain children who contains the points
-    while (!contain_list.empty() && list.size() <= max_query_id) {
-      search(contain_list.front().second, query_x, query_y, 
-          max_query_id, list);
-      contain_list.pop_front();
-    }
-    // search remain children who does not contain the points
-    while (!noncontain_list.empty() && list.size() <= max_query_id) {
-      search(noncontain_list.front().second, query_x, query_y, 
-          max_query_id, list);
-      noncontain_list.pop_front();
-    }    
   }
 }
 
@@ -775,10 +866,19 @@ void RTree::nsearch(const float query_x, const float query_y,
   // cout << query_x << ' ' << query_y << ' ' << max_query_id << endl;
   if (!root) return;   
   search(root, query_x, query_y, max_query_id, list);
+  //  cout << list.size() << endl;
+  
+  // for (vector<Leaf*>::iterator it = list.begin(); it != list.end(); it ++) {
+  //   cout << (*it)->min_distance << endl;
+  // }
+  sort(list.begin(), list.end(), compare_leaf);
+  // cout << "after sort" << endl;
+  // for (vector<Leaf*>::iterator it = list.begin(); it != list.end(); it ++) {
+  //   cout << (*it)->min_distance << endl;
+  // } 
 }
 
-int main() 
-{
+int main() {
   typedef unordered_map<size_t, Leaf*> LeafMap;
 
   size_t N = 0, T = 0, Q = 0;
@@ -828,20 +928,27 @@ int main()
   char query_type = '0';
   size_t max_query_id = 0;
   float query_x = 0, query_y = 0;
-  vector<Leaf*> topic_list;
-  vector<Leaf*> question_list;
-  //  for (int n_counter = 0; n_counter < N; n_counter++) {
-  for (int n_counter = 0; n_counter < 1; n_counter++) {
+  vector<Leaf*> result_list;
+  size_t max_length = 0;
+  for (int n_counter = 0; n_counter < N; n_counter++) {
+  //  for (int n_counter = 0; n_counter < 1; n_counter++) {
+ 
     cin >> query_type >> max_query_id >> query_x >> query_y;
+    // cout << query_type << ' ' << max_query_id << ' ' << query_x << ' ' << query_y << endl;
+    result_list.clear();
     if (query_type == 't') {
       // topic_tree
-      topic_list.clear();
-      topic_tree.nsearch(query_x, query_y, max_query_id, topic_list);
+      topic_tree.nsearch(query_x, query_y, max_query_id, result_list);
     } else if (query_type == 'q') {
       // question_tree
-      question_list.clear();
-      question_tree.nsearch(query_x, query_y, max_query_id, question_list);
+      question_tree.nsearch(query_x, query_y, max_query_id, result_list);
     }
+    max_length = min(result_list.size(), max_query_id);
+    for (size_t index = 0; index < max_length; index ++) {
+      cout << result_list[index]->id << ' ';
+      // cout << result_list[index]->min_distance << endl;
+    } 
+    cout << endl;
   }
 
   ////////////////////////////////////////
