@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <limits>
 #include <list>
+#include <unordered_set>
 
 using namespace std;
 
@@ -121,10 +122,10 @@ void BoundingBox::min_bounding_rectangle(
   const float y_array[] = {bbox1.y, bbox1.y + bbox1.h, 
                            bbox2.y, bbox2.y + bbox2.h};
 
-  vector<float> x_array_vec(x_array, x_array + 4);
-  vector<float> y_array_vec(y_array, y_array + 4);
+  vector<float> x_vector(x_array, x_array + 4);
+  vector<float> y_vector(y_array, y_array + 4);
  
-  min_bounding_rectangle(x_array_vec, y_array_vec, 
+  min_bounding_rectangle(x_vector, y_vector, 
                              new_x, new_y, new_w, new_h);
 }
 
@@ -154,10 +155,10 @@ void BoundingBox::min_bounding_rectangle(const vector<float>& x_array,
 void BoundingBox::enlarge(const float x1, const float y1) {
   const float x_array[] = {x, x + w, x1};
   const float y_array[] = {y, y + h, y1};
-  vector<float> x_array_vec(x_array, x_array + 3);
-  vector<float> y_array_vec(y_array, y_array + 3);
+  vector<float> x_vector(x_array, x_array + 3);
+  vector<float> y_vector(y_array, y_array + 3);
   // cout << "before " << x << ' ' << y << endl;
-  min_bounding_rectangle(x_array_vec, y_array_vec, &x, &y, &w, &h);
+  min_bounding_rectangle(x_vector, y_vector, &x, &y, &w, &h);
   // cout << "after " << x << ' ' << y << endl;
 }
 
@@ -165,23 +166,23 @@ void BoundingBox::enlarge(const BoundingBox* pbbox) {
 //  cout << x << ' ' << y << ' ' << pbbox->x << ' ' << pbbox->y << endl;
   const float x_array[] = {x, x + w, pbbox->x, pbbox->x + pbbox->w};
   const float y_array[] = {y, y + h, pbbox->y, pbbox->y + pbbox->h};
-  vector<float> x_array_vec(x_array, x_array + 4);
-  vector<float> y_array_vec(y_array, y_array + 4);
+  vector<float> x_vector(x_array, x_array + 4);
+  vector<float> y_vector(y_array, y_array + 4);
   // cout << "before " << x << ' ' << y << endl;
-  min_bounding_rectangle(x_array_vec, y_array_vec, &x, &y, &w, &h);
+  min_bounding_rectangle(x_vector, y_vector, &x, &y, &w, &h);
   // cout << "after " << x << ' ' << y << endl;
 }
 
 const float BoundingBox::enlargement(const float x1, const float y1) const {
   const float x_array[] = {x, x + w, x1};
   const float y_array[] = {y, y + h, y1};
-  vector<float> x_array_vec(x_array, x_array + 3);
-  vector<float> y_array_vec(y_array, y_array + 3);
+  vector<float> x_vector(x_array, x_array + 3);
+  vector<float> y_vector(y_array, y_array + 3);
   float new_x = x;
   float new_y = y;
   float new_w = w;
   float new_h = h;
-  min_bounding_rectangle(x_array_vec, y_array_vec, 
+  min_bounding_rectangle(x_vector, y_vector, 
                              &new_x, &new_y, &new_w, &new_h);
   return (new_w * new_h - this->area());
 }
@@ -189,13 +190,13 @@ const float BoundingBox::enlargement(const float x1, const float y1) const {
 const float BoundingBox::enlargement(const BoundingBox* pbbox) const {
   const float x_array[] = {x, x + w, pbbox->x, pbbox->x + pbbox->w};
   const float y_array[] = {y, y + h, pbbox->y, pbbox->y + pbbox->h};
-  vector<float> x_array_vec(x_array, x_array + 4);
-  vector<float> y_array_vec(y_array, y_array + 4);
+  vector<float> x_vector(x_array, x_array + 4);
+  vector<float> y_vector(y_array, y_array + 4);
   float new_x = x;
   float new_y = y;
   float new_w = w;
   float new_h = h;
-  min_bounding_rectangle(x_array_vec, y_array_vec, 
+  min_bounding_rectangle(x_vector, y_vector, 
                              &new_x, &new_y, &new_w, &new_h);
   return (new_w * new_h - this->area());
 }
@@ -213,6 +214,9 @@ class Leaf {
     float min_max_distance;
 };
 
+typedef unordered_map<size_t, Leaf*> LeafMap;
+typedef pair<size_t, Leaf*> LeafPair;
+
 bool compare_leaf(const Leaf* leaf1, const Leaf* leaf2) {
   if (fabs(leaf1->min_distance - leaf2->min_distance) < 0.001) {
     return leaf1->id > leaf2->id; 
@@ -222,15 +226,15 @@ bool compare_leaf(const Leaf* leaf1, const Leaf* leaf2) {
 
 class Node {
   public:
-    Node() { directory_rectangle = new BoundingBox(0.0, 0.0); }
+    Node() { rectangle = new BoundingBox(0.0, 0.0); }
     explicit Node(const float x, const float y) {
-      directory_rectangle = new BoundingBox(x, y);
+      rectangle = new BoundingBox(x, y);
     }
     explicit Node(const BoundingBox& bbox) {
-      directory_rectangle = new BoundingBox(bbox.x, bbox.y);
-      directory_rectangle->enlarge(bbox.x + bbox.w, bbox.y + bbox.h);
+      rectangle = new BoundingBox(bbox.x, bbox.y);
+      rectangle->enlarge(bbox.x + bbox.w, bbox.y + bbox.h);
     }
-    virtual ~Node() { delete directory_rectangle; }
+    virtual ~Node() { delete rectangle; }
 
     void insert_leaf(Leaf* leaf);
     void insert_children(Node* node);
@@ -244,9 +248,11 @@ class Node {
     void split_with_seeds(Node* &left_seed, Node* &right_seed,
                           Node* &left_node, Node* &right_node);
 
-    BoundingBox* directory_rectangle;
+    BoundingBox* rectangle;
     deque<Node*> children;
     deque<Leaf*> leaves;
+
+    LeafMap buffer; 
 
     float min_distance;
     float min_max_distance;
@@ -268,14 +274,14 @@ void Node::insert_leaf(Leaf* leaf) {
   // push leaf to leaves
   this->leaves.push_back(leaf);
   // enlarge the bounding box 
-  this->directory_rectangle->enlarge(leaf->min_bounding_box);
+  this->rectangle->enlarge(leaf->min_bounding_box);
 }
 
 void Node::insert_children(Node* node) {
   // push node to children
   this->children.push_back(node);
   // enlarge the bounding box
-  this->directory_rectangle->enlarge(node->directory_rectangle);
+  this->rectangle->enlarge(node->rectangle);
 }
 
 void Node::find_seeds(Node* &left_seed, Node* &right_seed) const {
@@ -289,12 +295,12 @@ void Node::find_seeds(Node* &left_seed, Node* &right_seed) const {
   for (; it1 != this->children.end(); it1 ++) {
     for (it2 = it1 + 1; it2 != this->children.end(); it2 ++) {
       BoundingBox::min_bounding_rectangle(
-          *(*it1)->directory_rectangle, *(*it2)->directory_rectangle, 
+          *(*it1)->rectangle, *(*it2)->rectangle, 
           &new_x, &new_y, &new_w, &new_h); 
 
       integral_area = new_w * new_h - 
-                      (*it1)->directory_rectangle->area() -
-                      (*it2)->directory_rectangle->area();
+                      (*it1)->rectangle->area() -
+                      (*it2)->rectangle->area();
       // cout << integral_area << endl;
       if (integral_area > max_integral_area) {
         max_integral_area = integral_area;
@@ -359,16 +365,16 @@ void Node::split_with_seeds(Node* &left_seed, Node* &right_seed,
   // cout << this->children.size() << ' ' << left_node->children.size();
   //  << ' ';  cout << right_node->children.size() << endl;
 
-  BoundingBox* left_mbbox = left_node->directory_rectangle;
-  BoundingBox* right_mbbox = right_node->directory_rectangle;
+  BoundingBox* left_mbbox = left_node->rectangle;
+  BoundingBox* right_mbbox = right_node->rectangle;
   float left_enlargement = 0, right_enlargement = 0;
   while (!this->children.empty()) {
     Node* node = this->children.back();
     if (node != left_seed && node != right_seed) {
       left_enlargement = 
-          left_mbbox->enlargement(node->directory_rectangle);
+          left_mbbox->enlargement(node->rectangle);
       right_enlargement = 
-          right_mbbox->enlargement(node->directory_rectangle);
+          right_mbbox->enlargement(node->rectangle);
       if (left_enlargement < right_enlargement) {
         // insert to left node
         left_node->children.push_back(node);
@@ -407,17 +413,17 @@ void Node::split_with_seeds(Node* &left_seed, Node* &right_seed,
   for (deque<Node*>::iterator it_left = left_node->children.begin() + 1;
       it_left != left_node->children.end(); it_left ++) {
     //    cout << "left " << *(*it_left)->min_bounding_box << endl;
-    left_node->directory_rectangle->
-        enlarge((*it_left)->directory_rectangle);
-    //    cout << *left_node->directory_rectangle << endl;
+    left_node->rectangle->
+        enlarge((*it_left)->rectangle);
+    //    cout << *left_node->rectangle << endl;
   }
   // enlarge right node
   for (deque<Node*>::iterator it_right = right_node->children.begin() + 1;
       it_right != right_node->children.end(); it_right ++) {
     //    cout << "right " << *(*it_right)->min_bounding_box << endl;
-    right_node->directory_rectangle->
-        enlarge((*it_right)->directory_rectangle);
-    //    cout << *right_node->directory_rectangle << endl;
+    right_node->rectangle->
+        enlarge((*it_right)->rectangle);
+    //    cout << *right_node->rectangle << endl;
   }
 }
 
@@ -427,8 +433,8 @@ void Node::split_with_seeds(Leaf* &left_seed, Leaf* & right_seed,
   left_node->leaves.push_back(left_seed);
   right_node->leaves.push_back(right_seed);
 
-  BoundingBox* left_mbbox = left_node->directory_rectangle;
-  BoundingBox* right_mbbox = right_node->directory_rectangle;
+  BoundingBox* left_mbbox = left_node->rectangle;
+  BoundingBox* right_mbbox = right_node->rectangle;
   float left_enlargement = 0, right_enlargement = 0;
   while (!this->leaves.empty()) {
     Leaf* leaf = this->leaves.back();
@@ -474,15 +480,15 @@ void Node::split_with_seeds(Leaf* &left_seed, Leaf* & right_seed,
   for (deque<Leaf*>::iterator it_left = left_node->leaves.begin() + 1;
       it_left != left_node->leaves.end(); it_left ++) {
     //    cout << "left " << *(*it_left)->min_bounding_box << endl;
-    left_node->directory_rectangle->enlarge((*it_left)->min_bounding_box);
-    //    cout << *left_node->directory_rectangle << endl;
+    left_node->rectangle->enlarge((*it_left)->min_bounding_box);
+    //    cout << *left_node->rectangle << endl;
   }
   // enlarge right node
   for (deque<Leaf*>::iterator it_right = right_node->leaves.begin() + 1;
       it_right != right_node->leaves.end(); it_right ++) {
     //    cout << "right " << *(*it_right)->min_bounding_box << endl;
-    right_node->directory_rectangle->enlarge((*it_right)->min_bounding_box);
-    //    cout << *right_node->directory_rectangle << endl;
+    right_node->rectangle->enlarge((*it_right)->min_bounding_box);
+    //    cout << *right_node->rectangle << endl;
   }
 }
 
@@ -496,11 +502,11 @@ void Node::quadratic_split(vector<Node*> parents) {
     cerr << "right seed null pointer" << endl;
 
   // create new left and right node with left and right seed x, y
-  Node* left_node = new Node(*left_seed->directory_rectangle);
-  Node* right_node = new Node(*right_seed->directory_rectangle);
+  Node* left_node = new Node(*left_seed->rectangle);
+  Node* right_node = new Node(*right_seed->rectangle);
 
-  //  cout << "left seed " << *left_seed->directory_rectangle << endl;
-  //  cout << "right seed " << *right_seed->directory_rectangle << endl;
+  //  cout << "left seed " << *left_seed->rectangle << endl;
+  //  cout << "right seed " << *right_seed->rectangle << endl;
   
   this->split_with_seeds(left_seed, right_seed, left_node, right_node);
   // cout << "left children " << left_node->children.size() << endl;
@@ -518,8 +524,8 @@ void Node::quadratic_split(vector<Node*> parents) {
     deque<Node*>::iterator it = parent->children.begin();
     // linearly iterate to find the current node in the parent's list
     for (; (*it) != this && it != parent->children.end(); it ++);
-    //    cout << this->directory_rectangle->area() << endl;
-    //    cout << (*it)->directory_rectangle->area() << endl;
+    //    cout << this->rectangle->area() << endl;
+    //    cout << (*it)->rectangle->area() << endl;
     //  cout << "found head" << endl;
 
     // remove the current node and insert two new nodes
@@ -538,7 +544,7 @@ void Node::quadratic_split(Leaf* new_leaf, vector<Node*> parents) {
   // first insert new leaf and enlarge
   //  this->insert_leaf(new_leaf);
   this->leaves.push_back(new_leaf);
-  this->directory_rectangle->enlarge(new_leaf->min_bounding_box);
+  this->rectangle->enlarge(new_leaf->min_bounding_box);
   
   // find most separated seed s1, s2
 
@@ -576,8 +582,8 @@ void Node::quadratic_split(Leaf* new_leaf, vector<Node*> parents) {
     deque<Node*>::iterator it = parent->children.begin();
     // linearly iterate to find the current node in the parent's list
     for (; (*it) != this && it != parent->children.end(); it ++);
-    //    cout << this->directory_rectangle->area() << endl;
-    //    cout << (*it)->directory_rectangle->area() << endl;
+    //    cout << this->rectangle->area() << endl;
+    //    cout << (*it)->rectangle->area() << endl;
 
     // remove the current node and insert two new nodes
     parent->children.erase(it); 
@@ -600,12 +606,14 @@ void Node::quadratic_split(Leaf* new_leaf, vector<Node*> parents) {
 class RTree 
 {
   public: 
-    RTree() : root(NULL) {}
+    RTree() : root(NULL), max_children(50) {}
+    RTree(size_t max_child) : root(NULL), max_children(max_child) {}
     ~RTree() {}
 
     void insert(Leaf* new_left);
-    void search(const Node* head, const float query_x, const float query_y,
-                const size_t max_query_id, vector<Leaf*>& list);
+    void search(Node* head, const float query_x, 
+                const float query_y, const size_t max_query_id,
+                vector<Leaf*>& list, Node* &cloest);
     void nsearch(const float query_x, const float query_y,
                  const size_t max_query_id, vector<Leaf*>& list);
 
@@ -614,10 +622,10 @@ class RTree
     void print_tree();
     void print_tree(Node* head);
     Node* root;
-    static const size_t max_children;
+    size_t max_children;
 };
 
-const size_t RTree::max_children = 4;
+//const size_t RTree::max_children = 50;
 
 void RTree::print_tree(Node* head) {
   deque<Node*> node_queue;
@@ -626,7 +634,7 @@ void RTree::print_tree(Node* head) {
   size_t layer = 0;
   while (!node_queue.empty()) {
     Node* node = node_queue.front();
-    cout << "root " << *node->directory_rectangle << endl;    
+    cout << "root " << *node->rectangle << endl;    
     for (deque<Node*>::iterator it_node = node->children.begin();
         it_node != node->children.end(); it_node ++) {
       node_queue.push_back(*it_node);
@@ -653,7 +661,7 @@ ostream& operator<<(ostream& out, RTree& tree) {
   size_t layer = 0;
   while (!node_queue.empty()) {
     Node* node = node_queue.front();
-    out << "root " << *node->directory_rectangle << endl;    
+    out << "root " << *node->rectangle << endl;    
     for (deque<Node*>::iterator it_node = node->children.begin();
         it_node != node->children.end(); it_node ++) {
       node_queue.push_back(*it_node);
@@ -680,7 +688,7 @@ void RTree::insert(Leaf* new_leaf)
     // init root with top-left point of new leaf
     root = new Node(mbbox->x, mbbox->y);
     // enlarge directory rectangle with bottom-right point of new leaf
-    root->directory_rectangle->enlarge(mbbox->x + mbbox->w, 
+    root->rectangle->enlarge(mbbox->x + mbbox->w, 
                                        mbbox->y + mbbox->h);
     root->leaves.push_back(new_leaf);
     return;
@@ -698,7 +706,7 @@ void RTree::insert(Leaf* new_leaf)
     deque<Node*>::iterator it_children = head->children.begin();
     for (; it_children != head->children.end(); it_children ++) {
       // cout << "iterare DRs " << endl; 
-      if ((*it_children)->directory_rectangle->
+      if ((*it_children)->rectangle->
                           contain(*new_leaf->min_bounding_box)) {
         next_head = *it_children;
         found_match = true;
@@ -713,7 +721,7 @@ void RTree::insert(Leaf* new_leaf)
       float min_enlargement_area = FLT_MAX; 
       float enlargement_area = 0;
       for (; it_children != head->children.end(); it_children ++) {
-        enlargement_area = (*it_children)->directory_rectangle->
+        enlargement_area = (*it_children)->rectangle->
             enlargement(new_leaf->min_bounding_box->x,
             new_leaf->min_bounding_box->y); 
         if (enlargement_area < min_enlargement_area) {
@@ -721,8 +729,8 @@ void RTree::insert(Leaf* new_leaf)
           it_min_enlargement = it_children;
         } else if (enlargement_area == min_enlargement_area) {
           // if more then one mode satisfy, choose the one with small area  
-          if ((*it_children)->directory_rectangle->area() <
-              (*it_min_enlargement)->directory_rectangle->area()) {
+          if ((*it_children)->rectangle->area() <
+              (*it_min_enlargement)->rectangle->area()) {
             it_min_enlargement = it_children;
           } 
         }
@@ -731,18 +739,18 @@ void RTree::insert(Leaf* new_leaf)
     }
     head = next_head;
   }
-  // cout << "head " << *head->directory_rectangle << endl;
+  // cout << "head " << *head->rectangle << endl;
 
   // check if the leaf node is not full
   if (head->leaves.size() < max_children) {
     //    cout << "new leaf insert " << new_leaf->id << endl;
     //    head->insert_leaf(new_leaf);
     head->leaves.push_back(new_leaf);
-    head->directory_rectangle->enlarge(new_leaf->min_bounding_box);
+    head->rectangle->enlarge(new_leaf->min_bounding_box);
     Node* parent = parent_stack.back();
     // enlarge all parents
     while (parent) {
-      parent->directory_rectangle->enlarge(head->directory_rectangle); 
+      parent->rectangle->enlarge(head->rectangle); 
       parent_stack.pop_back();
       head = parent;
       parent = parent_stack.back();
@@ -767,7 +775,7 @@ void RTree::insert(Leaf* new_leaf)
       //  cout << "after quadratic root split " << endl;
       //  print_tree();
       }
-      parent->directory_rectangle->enlarge(head->directory_rectangle);
+      parent->rectangle->enlarge(head->rectangle);
       head = parent;
       parent = parent_stack.back();
       parent_stack.pop_back();
@@ -775,35 +783,84 @@ void RTree::insert(Leaf* new_leaf)
   }
 }
 
-void RTree::search(const Node* head, const float query_x,
-    const float query_y, const size_t max_query_id, vector<Leaf*>& list) {
+void RTree::search(Node* head, const float query_x, 
+                   const float query_y, const size_t max_query_id,
+                   vector<Leaf*>& list, Node* &closest) {
   // found leave node
   if (!head) cerr << "null head" << endl;
   if (head->children.empty()) {
+    if (!closest) closest = const_cast<Node*>(head);
     deque<Leaf*>::const_iterator it_leaves = head->leaves.begin();
-    
-    for(; it_leaves != head->leaves.end(); it_leaves ++) {
-      (*it_leaves)->min_distance = (*it_leaves)->min_bounding_box->
-          actual_distance(query_x, query_y);
-      (*it_leaves)->min_max_distance = (*it_leaves)->min_bounding_box->
-          min_max_distance(query_x, query_y);
-      // cout << "push " << (*it_leaves)->id << endl;
-      list.push_back(*it_leaves);
-    }
-    
-    if (list.size() >= max_query_id) {
-      sort(list.begin(), list.end(), compare_leaf);
-      // cout << "extra" << endl;
-      while (list.size() > max_query_id) { list.pop_back(); }
-    }  
+   
+    // if (closest->buffer.empty()) { 
+      for(; it_leaves != head->leaves.end(); it_leaves ++) {
+        (*it_leaves)->min_distance = (*it_leaves)->min_bounding_box->
+            actual_distance(query_x, query_y);
+        (*it_leaves)->min_max_distance = (*it_leaves)->min_bounding_box->
+            min_max_distance(query_x, query_y);
+        //  cout << "push " << (*it_leaves)->id << endl;
+        list.push_back(*it_leaves);
+      }
+      if (list.size() >= max_query_id) {
+        sort(list.begin(), list.end(), compare_leaf);
+        // cout << "extra" << endl;
+        while (list.size() > max_query_id) { list.pop_back(); }
+      }  
+    //} else {
+    //  // cout << "buffer not empty size :";
+    //  // cout << closest->buffer.size() << endl; 
+    //  // for (LeafMap::iterator it = closest->buffer.begin(); 
+    //  //         it != closest->buffer.end(); it ++) {
+    //  //   cout << (*it).first << ' ';
+    //  // }
+    //  // cout << endl;
+
+    //  LeafMap::iterator it_buffer = closest->buffer.begin();
+    //  while (!list.empty()) {
+    //    //it_buffer = closest->buffer.find(list.back()->id);
+    //    //if (it_buffer == closest->buffer.end()) {
+    //      closest->buffer.insert(LeafPair(list.back()->id, list.back()));
+    //      // cout << "add more " << list.back()->id << endl;
+    //    //}
+    //    list.pop_back();
+    //  } 
+    //  it_buffer = closest->buffer.begin();
+    //  for(; it_buffer != closest->buffer.end(); it_buffer ++) {
+    //    (*it_buffer).second->min_distance = 
+    //        (*it_buffer).second->min_bounding_box->
+    //        actual_distance(query_x, query_y);
+    //    (*it_buffer).second->min_max_distance = 
+    //        (*it_buffer).second->min_bounding_box->
+    //        min_max_distance(query_x, query_y);       
+    //    list.push_back((*it_buffer).second);
+    //  }
+    //  deque<Leaf*>::const_iterator it_leaves = head->leaves.begin();
+    //  for(; it_leaves != head->leaves.end(); it_leaves ++) {
+    //    // cout << "add more " << (*it_leaves)->id << endl;
+    //    (*it_leaves)->min_distance = (*it_leaves)->min_bounding_box->
+    //        actual_distance(query_x, query_y);
+    //    (*it_leaves)->min_max_distance = (*it_leaves)->min_bounding_box->
+    //        min_max_distance(query_x, query_y);
+    //    // it_buffer = closest->buffer.find((*it_leaves)->id);
+    //    // if (it_buffer == closest->buffer.end()) {
+    //      closest->buffer.insert(LeafPair((*it_leaves)->id, *it_leaves));
+    //      // cout << "add more push " << (*it_leaves)->id << endl;
+    //      list.push_back(*it_leaves);
+    //    // }
+    //  }
+
+    //  // head->buffer.clear(); 
+    //  sort(list.begin(), list.end(), compare_leaf);
+    //  while (list.size() > max_query_id) { list.pop_back(); }
+    //}
   } else {
     vector<Node*> children_list; 
     deque<Node*>::const_iterator it_children = head->children.begin();
     for (; it_children != head->children.end(); it_children ++) {
-      (*it_children)->min_distance = (*it_children)->directory_rectangle
+      (*it_children)->min_distance = (*it_children)->rectangle
           ->min_distance(query_x, query_y);
       (*it_children)->min_max_distance = (*it_children)
-        ->directory_rectangle->min_max_distance(query_x, query_y);
+        ->rectangle->min_max_distance(query_x, query_y);
       children_list.push_back((*it_children));
     } 
     sort(children_list.begin(), children_list.end(), compare_node);
@@ -814,7 +871,7 @@ void RTree::search(const Node* head, const float query_x,
       // if buffer not full, kepp insert
       if (list.size() < max_query_id) {
         // cout << "fill buffer" << endl;
-        search(*it_list, query_x, query_y, max_query_id, list); 
+        search(*it_list, query_x, query_y, max_query_id, list, closest); 
       } else {
       // prune
         sort(list.begin(), list.end(), compare_leaf);
@@ -837,7 +894,7 @@ void RTree::search(const Node* head, const float query_x,
             // cout << (*it_list)->min_max_distance << ' ';
             // cout << list.back()->min_distance << ' ';
             // cout << list.back()->min_max_distance << endl;
-            //cout << "root " << *head->directory_rectangle << endl;
+            //cout << "root " << *head->rectangle << endl;
             // print_tree(*it_list);
               //  }
             continue;
@@ -850,14 +907,9 @@ void RTree::search(const Node* head, const float query_x,
         //     continue;
         //   }
         // }
-        search(*it_list, query_x, query_y, max_query_id, list); 
+        search(*it_list, query_x, query_y, max_query_id, list, closest); 
       }
     } 
-      
-    // for (size_t index = 0; index < children_list.size(); index ++) {
-    //   cout << children_list[index]->min_distance << ' ';
-    //   cout << children_list[index]->min_max_distance << endl;
-    // }
   }
 }
 
@@ -865,31 +917,37 @@ void RTree::nsearch(const float query_x, const float query_y,
                    const size_t max_query_id, vector<Leaf*>& list) {
   // cout << query_x << ' ' << query_y << ' ' << max_query_id << endl;
   if (!root) return;   
-  search(root, query_x, query_y, max_query_id, list);
-  //  cout << list.size() << endl;
-  
-  // for (vector<Leaf*>::iterator it = list.begin(); it != list.end(); it ++) {
-  //   cout << (*it)->min_distance << endl;
-  // }
+  Node* closest = NULL;
+  search(root, query_x, query_y, max_query_id, list, closest);
   sort(list.begin(), list.end(), compare_leaf);
-  // cout << "after sort" << endl;
-  // for (vector<Leaf*>::iterator it = list.begin(); it != list.end(); it ++) {
-  //   cout << (*it)->min_distance << endl;
-  // } 
+
+  if (!closest)
+    cout << "not found closest node" << endl;
+  else {
+    // cout << "found cloest node " << list.size() << endl;
+    LeafMap::iterator it_buffer = closest->buffer.begin();
+    for (vector<Leaf*>::iterator it = list.begin();
+        it != list.end(); it ++) {
+      // cout << "insert to buffer" << endl;
+      closest->buffer.insert(LeafPair((*it)->id, *it));
+    }
+  }
 }
 
 int main() {
-  typedef unordered_map<size_t, Leaf*> LeafMap;
-
   size_t N = 0, T = 0, Q = 0;
   cin >> T >> Q >> N;
 
-  RTree topic_tree;
+  size_t max_topic_tree_children = T * 0.005;
+  const size_t min_children = 4;
+  if (max_topic_tree_children < min_children) 
+    max_topic_tree_children = min_children;
+  RTree topic_tree(max_topic_tree_children);
+
   LeafMap topics;
   size_t id = 0;
   float x = 0, y = 0;
   for (size_t topic_counter = 0; topic_counter < T; topic_counter ++) {
-  //  for (size_t topic_counter = 0; topic_counter < 10; topic_counter ++) {
     cin >> id >> x >> y;
     topics[id] = new Leaf(id, x, y);
     topic_tree.insert(topics[id]);
@@ -897,7 +955,10 @@ int main() {
   //  cout << "insert topic tree" << endl;
   //  cout << topic_tree << endl;
 
-  RTree question_tree;
+  size_t max_question_tree_children = Q * 0.5;
+  if (max_question_tree_children < min_children) 
+    max_question_tree_children = min_children; 
+  RTree question_tree(max_question_tree_children);
   LeafMap questions;
   size_t topic_number = 0, topic_id;
   for (size_t question_counter = 0; question_counter < Q;
@@ -934,7 +995,6 @@ int main() {
   //  for (int n_counter = 0; n_counter < 1; n_counter++) {
  
     cin >> query_type >> max_query_id >> query_x >> query_y;
-    // cout << query_type << ' ' << max_query_id << ' ' << query_x << ' ' << query_y << endl;
     result_list.clear();
     if (query_type == 't') {
       // topic_tree
@@ -951,22 +1011,5 @@ int main() {
     cout << endl;
   }
 
-  ////////////////////////////////////////
-  // for (LeafMap::iterator it = topics.begin();
-  //     it != topics.end(); it ++) {
-  //   cout << *it->second->min_bounding_box << endl;
-  // }
-
-  // cout << "questions " << endl;
-  // for (LeafMap::iterator it = questions.begin();
-  //     it != questions.end(); it ++) {
-  // //  cout << it->first << ' ' << it->second->min_bounding_box->area();
-  // //  cout << ' ' << it->second->min_bounding_box->x;
-  // //  cout << ' ' << it->second->min_bounding_box->y << endl;
-  //   cout << it->second->id << ' ';
-  //   cout << it->second->min_bounding_box->vertices.size() << endl;
-  // }
-  ////////////////////////////////////////
- 
   return 0;
 }
