@@ -1,7 +1,7 @@
 all: nearby
 
 nearby:
-	clang++ -std=c++11 -stdlib=libc++ nearby.cpp -o nearby
+	g++-4.7 -std=c++11 nearby.cpp -o nearby
 
 clean:
 	rm -rf *.o nearby
