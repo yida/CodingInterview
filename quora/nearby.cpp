@@ -23,15 +23,15 @@ class BoundingBox {
     }
     ~BoundingBox() {}
 
-    inline static void min_bounding_rectangle(const float* x_array,
-        const float* y_array, const size_t array_size, float* new_x,
-        float* new_y, float* new_w, float* new_h);
+    inline static void min_bounding_rectangle(const float x_array[],
+        const float y_array[], const size_t array_size, float& new_x,
+        float& new_y, float& new_w, float& new_h);
     static void min_bounding_rectangle(
         const BoundingBox& bbox1, const BoundingBox& bbox2,
-        float* new_x, float* new_y, float* new_w, float* new_h);
+        float& new_x, float& new_y, float& new_w, float& new_h);
 
     inline const float enlargement(const float x1, const float y1) const;
-    inline const float enlargement(const BoundingBox* pbbox) const;
+    inline const float enlargement(const BoundingBox& bbox) const;
     inline const float area() const { return w * h; }
     inline const float actual_distance(const float x1,
                                        const float y1) const;
@@ -41,7 +41,7 @@ class BoundingBox {
     inline const bool contain(const BoundingBox& bbox) const ;
     inline const bool contain(const float x1, const float y1) const ;
     inline void enlarge(const float x1, const float y1);
-    inline void enlarge(const BoundingBox* pbbox);
+    inline void enlarge(const BoundingBox& pbbox);
 
     friend ostream& operator<<(ostream& out, BoundingBox& bbox);
     
@@ -118,7 +118,7 @@ inline const bool BoundingBox::contain(const BoundingBox& bbox) const {
 
 void BoundingBox::min_bounding_rectangle(
     const BoundingBox& bbox1, const BoundingBox& bbox2,
-    float* new_x, float* new_y, float* new_w, float* new_h) {
+    float& new_x, float& new_y, float& new_w, float& new_h) {
   const float x_array[] = {bbox1.x, bbox1.x + bbox1.w, 
                            bbox2.x, bbox2.x + bbox2.w};
   const float y_array[] = {bbox1.y, bbox1.y + bbox1.h, 
@@ -127,9 +127,9 @@ void BoundingBox::min_bounding_rectangle(
   min_bounding_rectangle(x_array, y_array, 4, new_x, new_y, new_w, new_h);
 }
 
-inline void BoundingBox::min_bounding_rectangle(const float* x_array, 
-    const float* y_array, const size_t array_size, float* new_x,
-    float* new_y, float* new_w, float* new_h) {
+inline void BoundingBox::min_bounding_rectangle(const float x_array[], 
+    const float y_array[], const size_t array_size, float& new_x,
+    float& new_y, float& new_w, float& new_h) {
   float new_distance = 0;
   float new_min_x = x_array[0];
   float new_min_y = y_array[0];
@@ -140,25 +140,25 @@ inline void BoundingBox::min_bounding_rectangle(const float* x_array,
 
     for (size_t index2 = index1; index2 < array_size; index2 ++) {
       new_distance = abs(x_array[index1] - x_array[index2]);
-      if (new_distance > *new_w) *new_w = new_distance;
+      if (new_distance > new_w) new_w = new_distance;
       new_distance = abs(y_array[index1] - y_array[index2]);
-      if (new_distance > *new_h) *new_h = new_distance;
+      if (new_distance > new_h) new_h = new_distance;
     }
   }
-  *new_x = new_min_x;
-  *new_y = new_min_y;
+  new_x = new_min_x;
+  new_y = new_min_y;
 }
 
 inline void BoundingBox::enlarge(const float x1, const float y1) {
   const float x_array[] = {x, x + w, x1};
   const float y_array[] = {y, y + h, y1};
-  min_bounding_rectangle(x_array, y_array, 3, &x, &y, &w, &h);
+  min_bounding_rectangle(x_array, y_array, 3, x, y, w, h);
 }
 
-inline void BoundingBox::enlarge(const BoundingBox* pbbox) {
-  const float x_array[] = {x, x + w, pbbox->x, pbbox->x + pbbox->w};
-  const float y_array[] = {y, y + h, pbbox->y, pbbox->y + pbbox->h};
-  min_bounding_rectangle(x_array, y_array, 4, &x, &y, &w, &h);
+inline void BoundingBox::enlarge(const BoundingBox& bbox) {
+  const float x_array[] = {x, x + w, bbox.x, bbox.x + bbox.w};
+  const float y_array[] = {y, y + h, bbox.y, bbox.y + bbox.h};
+  min_bounding_rectangle(x_array, y_array, 4, x, y, w, h);
 }
 
 inline const float BoundingBox::enlargement(const float x1, 
@@ -170,20 +170,20 @@ inline const float BoundingBox::enlargement(const float x1,
   float new_w = w;
   float new_h = h;
   min_bounding_rectangle(x_array, y_array, 3, 
-                         &new_x, &new_y, &new_w, &new_h);
+                         new_x, new_y, new_w, new_h);
   return (new_w * new_h - this->area());
 }
 
 inline const float BoundingBox::enlargement(
-    const BoundingBox* pbbox) const {
-  const float x_array[] = {x, x + w, pbbox->x, pbbox->x + pbbox->w};
-  const float y_array[] = {y, y + h, pbbox->y, pbbox->y + pbbox->h};
+    const BoundingBox& bbox) const {
+  const float x_array[] = {x, x + w, bbox.x, bbox.x + bbox.w};
+  const float y_array[] = {y, y + h, bbox.y, bbox.y + bbox.h};
   float new_x = x;
   float new_y = y;
   float new_w = w;
   float new_h = h;
   min_bounding_rectangle(x_array, y_array, 4,
-                             &new_x, &new_y, &new_w, &new_h);
+                             new_x, new_y, new_w, new_h);
   return (new_w * new_h - this->area());
 }
 
@@ -200,14 +200,14 @@ class Node {
       rectangle = new BoundingBox(bbox.x, bbox.y);
       rectangle->enlarge(bbox.x + bbox.w, bbox.y + bbox.h);
     }
-    virtual ~Node() { delete rectangle; }
+    ~Node() { delete rectangle; }
 
-    inline void insert(vector<Node*>& container, Node* node);
+    inline void insert(vector<Node*>& container, Node& node);
 
     void find_seeds(vector<Node*>& containter, Node* &left_seed, 
                     Node* &right_seed) const;
-    void quadratic_split(Node* new_leaf, vector<Node*> parents);
-    void quadratic_split(vector<Node*> parents);
+    void quadratic_split(Node& new_leaf, vector<Node*>& parents);
+    void quadratic_split(vector<Node*>& parents);
     void split_with_seeds(vector<Node*>& left_container,
         vector<Node*>& right_container, vector<Node*>& container,
         Node* &left_seed, Node* &right_seed, Node* &left_node, 
@@ -236,11 +236,11 @@ const bool compare_node(const Node* node1, const Node* node2) {
   return node1->min_max_distance < node2->min_max_distance;
 }
 
-inline void Node::insert(vector<Node*>& container, Node* node) {
+inline void Node::insert(vector<Node*>& container, Node& node) {
   // push node to children
-  container.push_back(node);
+  container.push_back(&node);
   // enlarge the bounding box
-  this->rectangle->enlarge(node->rectangle); 
+  this->rectangle->enlarge(*node.rectangle); 
 }
 
 void Node::find_seeds(vector<Node*>& containter, Node* &left_seed, 
@@ -254,7 +254,7 @@ void Node::find_seeds(vector<Node*>& containter, Node* &left_seed,
   for (; it1 != containter.end(); it1 ++) {
     for (it2 = it1 + 1; it2 != containter.end(); it2 ++) {
       BoundingBox::min_bounding_rectangle(*(*it1)->rectangle,
-          *(*it2)->rectangle, &new_x, &new_y, &new_w, &new_h); 
+          *(*it2)->rectangle, new_x, new_y, new_w, new_h); 
 
       integral_area = new_w * new_h - (*it1)->rectangle->area() -
                       (*it2)->rectangle->area();
@@ -284,8 +284,8 @@ void Node::split_with_seeds(vector<Node*>& left_container,
   while (!container.empty()) {
     Node* node = container.back();
     if (node != left_seed && node != right_seed) {
-      left_enlargement = left_mbbox->enlargement(node->rectangle);
-      right_enlargement = right_mbbox->enlargement(node->rectangle);
+      left_enlargement = left_mbbox->enlargement(*node->rectangle);
+      right_enlargement = right_mbbox->enlargement(*node->rectangle);
       if (left_enlargement < right_enlargement) {
         // insert to left node
         left_container.push_back(node);
@@ -317,16 +317,16 @@ void Node::split_with_seeds(vector<Node*>& left_container,
   // enlarge left node
   for (vector<Node*>::iterator it_left = left_container.begin() + 1;
       it_left != left_container.end(); it_left ++) {
-    left_node->rectangle->enlarge((*it_left)->rectangle);
+    left_node->rectangle->enlarge(*(*it_left)->rectangle);
   }
   // enlarge right node
   for (vector<Node*>::iterator it_right = right_container.begin() + 1;
       it_right != right_container.end(); it_right ++) {
-    right_node->rectangle->enlarge((*it_right)->rectangle);
+    right_node->rectangle->enlarge(*(*it_right)->rectangle);
   }
 }
 
-void Node::quadratic_split(vector<Node*> parents) {
+void Node::quadratic_split(vector<Node*>& parents) {
   Node* left_seed = NULL;
   Node* right_seed = NULL;
   this->find_seeds(this->children, left_seed, right_seed);
@@ -343,29 +343,27 @@ void Node::quadratic_split(vector<Node*> parents) {
       this->children, left_seed, right_seed, left_node, right_node);
 
   if (!parents.back()) {
-      this->insert(this->children, left_node);
-      this->insert(this->children, right_node);
+      this->insert(this->children, *left_node);
+      this->insert(this->children, *right_node);
   } else {
     // insert to parents' children list
     Node* parent = parents.back();
-    // cout << "parent stack size " << parents.size() << endl;
     vector<Node*>::iterator it = parent->children.begin();
     // linearly iterate to find the current node in the parent's list
     for (; (*it) != this && it != parent->children.end(); it ++);
 
     // remove the current node and insert two new nodes
     parent->children.erase(it); 
-    parent->insert(parent->children, left_node);
-    parent->insert(parent->children, right_node);
+    parent->insert(parent->children, *left_node);
+    parent->insert(parent->children, *right_node);
   }
 }
 
-void Node::quadratic_split(Node* new_leaf, vector<Node*> parents) {
+void Node::quadratic_split(Node& new_leaf, vector<Node*>& parents) {
   // first insert new leaf and enlarge
   this->insert(this->leaves, new_leaf);
 
   // find most separated seed s1, s2
-
   Node* left_seed = NULL;
   Node* right_seed = NULL;
   this->find_seeds(this->leaves, left_seed, right_seed);
@@ -383,8 +381,8 @@ void Node::quadratic_split(Node* new_leaf, vector<Node*> parents) {
  
   if (!parents.back()) { // current head is top root
     //    cout << "separate parent" << endl;
-    this->insert(this->children, left_node);
-    this->insert(this->children, right_node);
+    this->insert(this->children, *left_node);
+    this->insert(this->children, *right_node);
   } else {
     // insert to parents' children list
     Node* parent = parents.back();
@@ -394,8 +392,8 @@ void Node::quadratic_split(Node* new_leaf, vector<Node*> parents) {
 
     // remove the current node and insert two new nodes
     parent->children.erase(it); 
-    parent->insert(parent->children, left_node);
-    parent->insert(parent->children, right_node);
+    parent->insert(parent->children, *left_node);
+    parent->insert(parent->children, *right_node);
   }
 }
 
@@ -406,8 +404,8 @@ class RTree
     RTree(size_t max_child) : root(NULL), max_children(max_child) {}
     ~RTree() {}
 
-    void insert(Node* new_left);
-    void search(Node* head, const float query_x, const float query_y,
+    void insert(Node& new_left);
+    void search(Node& head, const float query_x, const float query_y,
                 const size_t max_query_id, vector<Node*>& list);
     void nsearch(const float query_x, const float query_y,
                  const size_t max_query_id, vector<Node*>& list);
@@ -445,14 +443,14 @@ void RTree::print_tree() {
   print_tree(root);
 }
 
-void RTree::insert(Node* new_leaf) {
-  BoundingBox* mbbox = new_leaf->rectangle;
+void RTree::insert(Node& new_leaf) {
+  BoundingBox& mbbox = *new_leaf.rectangle;
   if (!root) {
     // init root with top-left point of new leaf
-    root = new Node(mbbox->x, mbbox->y);
+    root = new Node(mbbox.x, mbbox.y);
     // enlarge directory rectangle with bottom-right point of new leaf
-    root->rectangle->enlarge(mbbox->x + mbbox->w, mbbox->y + mbbox->h);
-    root->leaves.push_back(new_leaf);
+    root->rectangle->enlarge(mbbox.x + mbbox.w, mbbox.y + mbbox.h);
+    root->leaves.push_back(&new_leaf);
     return;
   }
   Node* head = root;   
@@ -466,7 +464,7 @@ void RTree::insert(Node* new_leaf) {
     // first searching node whode DR contains the mbb of new leaf
     vector<Node*>::iterator it_children = head->children.begin();
     for (; it_children != head->children.end(); it_children ++) {
-      if ((*it_children)->rectangle->contain(*new_leaf->rectangle)) {
+      if ((*it_children)->rectangle->contain(*new_leaf.rectangle)) {
         next_head = *it_children;
         found_match = true;
       }
@@ -480,8 +478,7 @@ void RTree::insert(Node* new_leaf) {
       float enlargement_area = 0;
       for (; it_children != head->children.end(); it_children ++) {
         enlargement_area = (*it_children)->rectangle->
-            enlargement(new_leaf->rectangle->x,
-            new_leaf->rectangle->y); 
+            enlargement(*new_leaf.rectangle); 
         if (enlargement_area < min_enlargement_area) {
           min_enlargement_area = enlargement_area;
           it_min_enlargement = it_children;
@@ -497,7 +494,6 @@ void RTree::insert(Node* new_leaf) {
     }
     head = next_head;
   }
-  // cout << "head " << *head->rectangle << endl;
 
   // check if the leaf node is not full
   if (head->leaves.size() < max_children) {
@@ -505,7 +501,7 @@ void RTree::insert(Node* new_leaf) {
     Node* parent = parent_stack.back();
     // enlarge all parents
     while (parent) {
-      parent->rectangle->enlarge(head->rectangle); 
+      parent->rectangle->enlarge(*head->rectangle); 
       parent_stack.pop_back();
       head = parent;
       parent = parent_stack.back();
@@ -521,7 +517,7 @@ void RTree::insert(Node* new_leaf) {
       if (parent->children.size() > max_children) {
         parent->quadratic_split(parent_stack);
       }
-      parent->rectangle->enlarge(head->rectangle);
+      parent->rectangle->enlarge(*head->rectangle);
       head = parent;
       parent = parent_stack.back();
       parent_stack.pop_back();
@@ -529,13 +525,13 @@ void RTree::insert(Node* new_leaf) {
   }
 }
 
-void RTree::search(Node* head, const float query_x, const float query_y,
+void RTree::search(Node& head, const float query_x, const float query_y,
                    const size_t max_query_id, vector<Node*>& list) {
   // found leave node
-  if (head->children.empty()) {
-    vector<Node*>::const_iterator it_leaves = head->leaves.begin();
+  if (head.children.empty()) {
+    vector<Node*>::const_iterator it_leaves = head.leaves.begin();
    
-    for(; it_leaves != head->leaves.end(); it_leaves ++) {
+    for(; it_leaves != head.leaves.end(); it_leaves ++) {
       (*it_leaves)->min_distance = (*it_leaves)->rectangle->
           actual_distance(query_x, query_y);
       (*it_leaves)->min_max_distance = (*it_leaves)->rectangle->
@@ -547,28 +543,23 @@ void RTree::search(Node* head, const float query_x, const float query_y,
       while (list.size() > max_query_id) { list.pop_back(); }
     }
   } else {
-    vector<Node*>::const_iterator it_children = head->children.begin();
-    for (; it_children != head->children.end(); it_children ++) {
+    vector<Node*>::const_iterator it_children = head.children.begin();
+    for (; it_children != head.children.end(); it_children ++) {
       (*it_children)->min_distance = (*it_children)->rectangle
           ->min_distance(query_x, query_y);
       (*it_children)->min_max_distance = (*it_children)
         ->rectangle->min_max_distance(query_x, query_y);
     } 
-    sort(head->children.begin(), head->children.end(), compare_node);
+    sort(head.children.begin(), head.children.end(), compare_node);
     
-    vector<Node*>::iterator it_list = head->children.begin();
-    for (; it_list != head->children.end(); it_list ++) {
+    vector<Node*>::iterator it_list = head.children.begin();
+    for (; it_list != head.children.end(); it_list ++) {
       // if buffer not full, kepp insert
       if (list.size() < max_query_id) {
-        search(*it_list, query_x, query_y, max_query_id, list); 
+        search(*(*it_list), query_x, query_y, max_query_id, list); 
       } else {
       // prune
         sort(list.begin(), list.end(), compare_leaf);
-        // cout << "list ";
-        // for (size_t index = 0; index < list.size(); index ++)
-        //   cout << list[index]->id << ':';
-        //   cout << list[index]->min_distance << ' ';
-        // cout << endl;
         // if (list.back()->min_distance > (*it_list)->min_max_distance) {
         //   // cout << list.back()->min_distance << ' ';
         //   // cout << (*it_list)->min_max_distance << ' ';
@@ -580,7 +571,7 @@ void RTree::search(Node* head, const float query_x, const float query_y,
           if ((*it_list)->min_distance > list.back()->min_max_distance)
             continue;
         }
-        // vector<Node*>::iterator it_compare = head->children.begin();
+        // vector<Node*>::iterator it_compare = head.children.begin();
         // for (it_compare = children_list.begin(); it_compare != it_list &&
         //     it_compare != children_list.end(); it_compare ++) { 
         //   if ((*it_list)->min_distance > (*it_compare)->min_max_distance) {
@@ -588,7 +579,7 @@ void RTree::search(Node* head, const float query_x, const float query_y,
         //     continue;
         //   }
         // }
-        search(*it_list, query_x, query_y, max_query_id, list); 
+        search(*(*it_list), query_x, query_y, max_query_id, list); 
       }
     } 
   }
@@ -598,7 +589,7 @@ void RTree::nsearch(const float query_x, const float query_y,
                    const size_t max_query_id, vector<Node*>& list) {
   if (!root) return;   
   Node* closest = NULL;
-  search(root, query_x, query_y, max_query_id, list);
+  search(*root, query_x, query_y, max_query_id, list);
   sort(list.begin(), list.end(), compare_leaf);
 }
 
@@ -618,7 +609,7 @@ int main() {
   for (size_t topic_counter = 0; topic_counter < T; topic_counter ++) {
     cin >> id >> x >> y;
     topics[id] = new Node(id, x, y);
-    topic_tree.insert(topics[id]);
+    topic_tree.insert(*topics[id]);
   }
 
   size_t max_question_tree_children = Q * 0.5;
@@ -639,12 +630,12 @@ int main() {
         cin >> topic_id;
         topic_mbbox = topics[topic_id]->rectangle;
         BoundingBox* question_mbbox = questions[id]->rectangle;
-        question_mbbox->enlarge(topic_mbbox);
+        question_mbbox->enlarge(*topic_mbbox);
         question_mbbox->vertices.push_back(pair<float, float>(
             topics[topic_id]->rectangle->vertices.back().first,
             topics[topic_id]->rectangle->vertices.back().second));
       }
-      question_tree.insert(questions[id]);
+      question_tree.insert(*questions[id]);
     }
   }
 
