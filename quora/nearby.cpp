@@ -456,7 +456,8 @@ void RTree::insert(Node* new_leaf) {
     return;
   }
   Node* head = root;   
-  vector<Node *> parent_stack(1, NULL);
+  vector<Node *> parent_stack;
+  parent_stack.push_back(NULL);
   // traverse R-tree top-down
   Node* next_head = NULL;
   while (!head->children.empty()) {
