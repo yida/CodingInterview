@@ -275,8 +275,11 @@ void Node::split_with_seeds(vector<Node*>& left_container,
     Node* &left_seed, Node* &right_seed, Node* &left_node,
     Node* &right_node) {
   // push left and right seed 
-  left_container.push_back(left_seed);
-  right_container.push_back(right_seed);
+  left_container.resize(container.size());
+  right_container.resize(container.size());
+  size_t left_counter = 0, right_counter = 0;
+  left_container[left_counter ++] = left_seed;
+  right_container[right_counter ++] = right_seed;
 
   BoundingBox* left_mbbox = left_node->rectangle;
   BoundingBox* right_mbbox = right_node->rectangle;
@@ -288,32 +291,34 @@ void Node::split_with_seeds(vector<Node*>& left_container,
       right_enlargement = right_mbbox->enlargement(*node->rectangle);
       if (left_enlargement < right_enlargement) {
         // insert to left node
-        left_container.push_back(node);
+        left_container[left_counter ++] = node;
       } else if (left_enlargement > right_enlargement) {
         // insert to right node
-        right_container.push_back(node);
+        right_container[right_counter ++] = node;
       } else {
         // same enlargement, choose with smaller area 
         if (left_mbbox->area() < right_mbbox->area()) {
           // insert to left node
-          left_container.push_back(node);
+          left_container[left_counter ++] = node;
         } else if (left_mbbox->area() > right_mbbox->area()) {
           // insert to right node
-          right_container.push_back(node);
+          right_container[right_counter ++] = node;
         } else {
           // same area, choose with fewer element
           if (left_container.size() <= right_container.size()) {
             // insert to left node
-            left_container.push_back(node);
+            left_container[left_counter ++] = node;
           } else {
             // insert to right node
-            right_container.push_back(node);
+            right_container[right_counter ++] = node;
           }
         }
       }
     } 
     container.pop_back();
   }
+  left_container.resize(left_counter);
+  right_container.resize(right_counter);
   // enlarge left node
   for (vector<Node*>::iterator it_left = left_container.begin() + 1;
       it_left != left_container.end(); it_left ++) {
@@ -566,7 +571,6 @@ void RTree::search(Node& head, const float query_x, const float query_y,
         //   // cout << "downward pruning" << endl;
         //   list.pop_back();
         // }
-        // cout << "list size " << list.size() << endl;
         if (!list.empty()) {
           if ((*it_list)->min_distance > list.back()->min_max_distance)
             continue;
@@ -625,15 +629,16 @@ int main() {
       cin >> topic_id;
       BoundingBox* topic_mbbox = topics[topic_id]->rectangle;
       questions[id] = new Node(id, topic_mbbox->x, topic_mbbox->y);
+      questions[id]->rectangle->vertices.resize(topic_number);
       for (size_t topic_counter = 1; topic_counter < topic_number;
           topic_counter ++) {
         cin >> topic_id;
         topic_mbbox = topics[topic_id]->rectangle;
         BoundingBox* question_mbbox = questions[id]->rectangle;
         question_mbbox->enlarge(*topic_mbbox);
-        question_mbbox->vertices.push_back(pair<float, float>(
+        question_mbbox->vertices[topic_counter] = pair<float, float>(
             topics[topic_id]->rectangle->vertices.back().first,
-            topics[topic_id]->rectangle->vertices.back().second));
+            topics[topic_id]->rectangle->vertices.back().second);
       }
       question_tree.insert(*questions[id]);
     }
